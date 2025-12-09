@@ -47,6 +47,21 @@ services:
     volumes:
       - neo4j_data:/data
       - neo4j_logs:/logs
+
+  cli:
+    build: ./backend
+    container_name: redk_cli
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - API_URL=http://redk_api:8000   # <- CAMBIAR AQUÍ
+    depends_on:
+      - api
+    entrypoint: ["sleep", "infinity"]
+    volumes:
+      - ./backend:/code
+
 volumes:
   mongo_data:
   redis_data:

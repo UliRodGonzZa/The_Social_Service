@@ -9,3 +9,6 @@ redis
 neo4j
 
 python-dotenv
+email-validator
+typer[all]
+requests
