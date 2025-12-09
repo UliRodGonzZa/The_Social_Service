@@ -118,43 +118,6 @@ def create_post(
     typer.echo(f"  tags     : {data.get('tags')}")
     typer.echo(f"  created  : {data.get('created_at')}")
 
-@app.command("get-feed")
-def get_feed(
-    username: str = typer.Argument(..., help="Usuario del que se quiere ver el feed"),
-    limit: int = typer.Option(20, "--limit", "-l", help="Número máximo de posts"),
-):
-    """
-    Obtiene el feed de un usuario llamando a GET /users/{username}/feed
-    """
-    params = {"limit": limit}
-    try:
-        resp = requests.get(f"{API_URL}/users/{username}/feed", params=params)
-    except Exception as e:
-        typer.echo(f"[ERROR] No se pudo conectar a la API: {e}")
-        raise typer.Exit(code=1)
-
-    if resp.status_code != 200:
-        typer.echo(f"[ERROR] La API respondió {resp.status_code}:")
-        typer.echo(resp.text)
-        raise typer.Exit(code=1)
-
-    posts = resp.json()
-    if not posts:
-        typer.echo(f"No hay posts en el feed de {username}.")
-        raise typer.Exit()
-
-    typer.echo(f"🧵 Feed de {username}:")
-    for p in posts:
-        typer.echo("-" * 60)
-        typer.echo(f"id       : {p.get('id')}")
-        typer.echo(f"author   : {p.get('author_username')}")
-        typer.echo(f"created  : {p.get('created_at')}")
-        typer.echo(f"content  : {p.get('content')}")
-        tags = p.get("tags") or []
-        if tags:
-            typer.echo(f"tags     : {', '.join(tags)}")
-    typer.echo("-" * 60)
-    typer.echo(f"Total: {len(posts)} posts")
 
 
 @app.command("follow-user")
@@ -211,6 +174,90 @@ def list_following(
         typer.echo(f"bio      : {p.get('bio')}")
     typer.echo("-" * 40)
     typer.echo(f"Total: {len(people)} usuarios seguidos")
+
+@app.command("get-suggestions")
+def get_suggestions(
+    username: str = typer.Argument(..., help="Usuario para el que se quieren sugerencias"),
+    limit: int = typer.Option(10, "--limit", "-l", help="Número máximo de sugerencias"),
+):
+    """
+    Obtiene sugerencias de usuarios a seguir usando GET /users/{username}/suggestions
+    """
+    params = {"limit": limit}
+    try:
+        resp = requests.get(f"{API_URL}/users/{username}/suggestions", params=params)
+    except Exception as e:
+        typer.echo(f="[ERROR] No se pudo conectar a la API: {e}")
+        raise typer.Exit(code=1)
+
+    if resp.status_code != 200:
+        typer.echo(f"[ERROR] La API respondió {resp.status_code}:")
+        typer.echo(resp.text)
+        raise typer.Exit(code=1)
+
+    sugs = resp.json()
+    if not sugs:
+        typer.echo(f"No hay sugerencias para {username}.")
+        raise typer.Exit()
+
+    typer.echo(f"✨ Sugerencias para {username}:")
+    for s in sugs:
+        typer.echo("-" * 60)
+        typer.echo(f"username : {s.get('username')}")
+        typer.echo(f"name     : {s.get('name')}")
+        typer.echo(f"email    : {s.get('email')}")
+        typer.echo(f"bio      : {s.get('bio')}")
+        typer.echo(f"score    : {s.get('score')}")
+        if s.get("reason"):
+            typer.echo(f"reason   : {s.get('reason')}")
+    typer.echo("-" * 60)
+    typer.echo(f"Total: {len(sugs)} sugerencias")
+
+
+@app.command("get-feed")
+def get_feed(
+    username: str = typer.Argument(..., help="Usuario del que se quiere ver el feed"),
+    limit: int = typer.Option(20, "--limit", "-l", help="Número máximo de posts"),
+    mode: str = typer.Option(
+        "all",
+        "--mode",
+        "-m",
+        help="Modo del feed: all, self, following",
+    ),
+):
+    """
+    Obtiene el feed de un usuario llamando a GET /users/{username}/feed
+    """
+    params = {"limit": limit, "mode": mode}
+    try:
+        resp = requests.get(f"{API_URL}/users/{username}/feed", params=params)
+    except Exception as e:
+        typer.echo(f"[ERROR] No se pudo conectar a la API: {e}")
+        raise typer.Exit(code=1)
+
+    if resp.status_code != 200:
+        typer.echo(f"[ERROR] La API respondió {resp.status_code}:")
+        typer.echo(resp.text)
+        raise typer.Exit(code=1)
+
+    posts = resp.json()
+    if not posts:
+        typer.echo(f"No hay posts en el feed de {username} (mode={mode}).")
+        raise typer.Exit()
+
+    typer.echo(f"Feed de {username} (mode={mode}):")
+    for p in posts:
+        typer.echo("-" * 60)
+        typer.echo(f"id       : {p.get('id')}")
+        typer.echo(f"author   : {p.get('author_username')}")
+        typer.echo(f"created  : {p.get('created_at')}")
+        typer.echo(f"content  : {p.get('content')}")
+        tags = p.get("tags") or []
+        if tags:
+            typer.echo(f"tags     : {', '.join(tags)}")
+    typer.echo("-" * 60)
+    typer.echo(f"Total: {len(posts)} posts")
+
 
 if __name__ == "__main__":
     app()

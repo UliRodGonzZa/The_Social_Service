@@ -11,7 +11,7 @@ from neo4j import GraphDatabase
 
 from datetime import datetime
 import json
-
+from enum import Enum
 
 load_dotenv()
 
@@ -54,6 +54,18 @@ class PostOut(BaseModel):
     tags: Optional[List[str]] = None
     created_at: str  # ISO string
 
+class FeedMode(str, Enum):
+    all = "all"          # posts tuyos + de quienes sigues
+    self_only = "self"   # solo tus posts
+    following_only = "following"  # solo posts de quienes sigues
+
+class SuggestionOut(BaseModel):
+    username: str
+    name: Optional[str] = None
+    bio: Optional[str] = None
+    email: Optional[str] = None
+    score: int
+    reason: Optional[str] = None
 
 # --------- Helpers de DB (simples, por-request) ---------
 
@@ -505,3 +517,190 @@ def get_user_feed(username: str, limit: int = 20):
             pass
 
     return posts
+
+@app.get("/users/{username}/feed", response_model=List[PostOut])
+def get_user_feed(
+    username: str,
+    limit: int = 20,
+    mode: FeedMode = FeedMode.all,
+):
+    """
+    Feed del usuario:
+    - mode = all: posts del usuario + de quienes sigue
+    - mode = self: solo posts del usuario
+    - mode = following: solo posts de quienes sigue
+    - Usa Neo4j para obtener a quién sigue
+    - Usa Mongo para traer posts
+    - Usa Redis para cachear el resultado
+    """
+    db = get_mongo_db()
+    users_col = db["users"]
+    posts_col = db["posts"]
+
+    # Intentar conectar a Redis (opcional)
+    try:
+        r = get_redis_client()
+    except Exception:
+        r = None
+
+    # Verificar que el usuario exista
+    user_doc = users_col.find_one({"username": username})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    user_id = str(user_doc["_id"])
+
+    # Cache key depende de username + modo + limit
+    cache_key = f"feed:{username}:{mode.value}:{limit}"
+
+    # Intentar leer de cache
+    if r is not None:
+        cached = r.get(cache_key)
+        if cached:
+            try:
+                data = json.loads(cached)
+                return data
+            except Exception:
+                pass  # si falla parseo, seguimos normal
+
+    # Construir lista de autores según el modo
+    authors: List[str] = []
+
+    if mode in (FeedMode.all, FeedMode.self_only):
+        authors.append(username)
+
+    followed_usernames: List[str] = []
+
+    if mode in (FeedMode.all, FeedMode.following_only):
+        # Obtener a quién sigue desde Neo4j
+        try:
+            driver = get_neo4j_driver()
+            with driver.session() as session:
+                result = session.run(
+                    """
+                    MATCH (u:User {id: $user_id})-[:FOLLOWS]->(f:User)
+                    RETURN f.username AS username
+                    """,
+                    user_id=user_id,
+                )
+                for record in result:
+                    uname = record["username"]
+                    if uname and uname not in followed_usernames:
+                        followed_usernames.append(uname)
+            driver.close()
+        except Exception:
+            # si Neo4j falla, simplemente no añadimos seguidos
+            pass
+
+        authors.extend([u for u in followed_usernames if u not in authors])
+
+    if not authors:
+        # no hay nadie de quien traer posts
+        return []
+
+    # Traer posts desde Mongo
+    cursor = (
+        posts_col.find(
+            {"author_username": {"$in": authors}}
+        )
+        .sort("created_at", -1)
+        .limit(limit)
+    )
+
+    posts: List[PostOut] = []
+    for d in cursor:
+        posts.append(
+            PostOut(
+                id=str(d.get("_id")),
+                author_username=d.get("author_username"),
+                content=d.get("content"),
+                tags=d.get("tags") or [],
+                created_at=d.get("created_at"),
+            )
+        )
+
+    # Cachear feed en Redis por 60 segundos
+    if r is not None:
+        try:
+            r.setex(cache_key, 60, json.dumps([p.dict() for p in posts]))
+        except Exception:
+            pass
+
+    return posts
+
+@app.get("/users/{username}/suggestions", response_model=List[SuggestionOut])
+def get_suggestions(username: str, limit: int = 10):
+    """
+    Sugerencias de usuarios a seguir usando Neo4j:
+    - "Amigos de tus amigos" que aún no sigues (2-hop)
+    - Se ordenan por score = número de caminos 2-hop
+    """
+    db = get_mongo_db()
+    users_col = db["users"]
+
+    user_doc = users_col.find_one({"username": username})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    user_id = str(user_doc["_id"])
+
+    suggestions: List[SuggestionOut] = []
+
+    try:
+        driver = get_neo4j_driver()
+        with driver.session() as session:
+            result = session.run(
+                """
+                MATCH (u:User {id: $user_id})-[:FOLLOWS]->(:User)-[:FOLLOWS]->(s:User)
+                WHERE s.id <> $user_id
+                  AND NOT (u)-[:FOLLOWS]->(s)
+                RETURN s.username AS username,
+                       s.name AS name,
+                       s.bio AS bio,
+                       s.email AS email,
+                       COUNT(*) AS score
+                ORDER BY score DESC, username ASC
+                LIMIT $limit
+                """,
+                user_id=user_id,
+                limit=limit,
+            )
+            for record in result:
+                suggestions.append(
+                    SuggestionOut(
+                        username=record["username"],
+                        name=record.get("name"),
+                        bio=record.get("bio"),
+                        email=record.get("email"),
+                        score=record["score"],
+                        reason="Amigos de tus amigos",
+                    )
+                )
+        driver.close()
+    except Exception as e:
+        # si Neo4j falla, devolvemos vacío (o podríamos hacer fallback a Mongo)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al consultar sugerencias en Neo4j: {e}",
+        )
+
+    # Si no hay sugerencias basadas en grafo, opcionalmente podemos hacer fallback
+    if not suggestions:
+        # Fallback simple: usuarios aleatorios de Mongo que no sea él mismo
+        docs = (
+            users_col.find({"username": {"$ne": username}})
+            .limit(limit)
+        )
+        for d in docs:
+            suggestions.append(
+                SuggestionOut(
+                    username=d.get("username"),
+                    name=d.get("name"),
+                    bio=d.get("bio"),
+                    email=d.get("email"),
+                    score=1,
+                    reason="Usuarios aleatorios (sin datos de grafo suficientes)",
+                )
+            )
+
+    return suggestions
