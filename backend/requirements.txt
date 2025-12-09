@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+
+typer[all]
+requests
+
+pymongo
+redis
+neo4j
+
+python-dotenv
