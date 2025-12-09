@@ -9,6 +9,10 @@ from pymongo import MongoClient
 import redis
 from neo4j import GraphDatabase
 
+from datetime import datetime
+import json
+
+
 load_dotenv()
 
 app = FastAPI(title="Red K - API")
@@ -36,6 +40,19 @@ class UserOut(BaseModel):
     email: str
     name: Optional[str] = None
     bio: Optional[str] = None
+
+class PostCreate(BaseModel):
+    author_username: str
+    content: str
+    tags: Optional[List[str]] = None
+
+
+class PostOut(BaseModel):
+    id: str
+    author_username: str
+    content: str
+    tags: Optional[List[str]] = None
+    created_at: str  # ISO string
 
 
 # --------- Helpers de DB (simples, por-request) ---------
@@ -324,3 +341,167 @@ def list_following(username: str):
         )
 
     return following
+
+@app.post("/posts/", response_model=PostOut)
+def create_post(post: PostCreate):
+    """
+    Crea un post:
+    - Guarda en MongoDB (colección `posts`)
+    - Crea nodo (:Post) y relación (:User)-[:POSTED]->(:Post) en Neo4j
+    - Invalidata el feed cacheado del autor en Redis
+    """
+    db = get_mongo_db()
+    users_col = db["users"]
+    posts_col = db["posts"]
+
+    # Verificar que el autor exista
+    user_doc = users_col.find_one({"username": post.author_username})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Autor no encontrado")
+
+    user_id = str(user_doc["_id"])
+    created_at = datetime.utcnow().isoformat()
+
+    doc = {
+        "author_username": post.author_username,
+        "author_id": user_id,
+        "content": post.content,
+        "tags": post.tags or [],
+        "created_at": created_at,
+    }
+
+    # Insertar en Mongo
+    result = posts_col.insert_one(doc)
+    post_id = str(result.inserted_id)
+
+    # Crear nodo Post y relación en Neo4j
+    try:
+        driver = get_neo4j_driver()
+        with driver.session() as session:
+            session.run(
+                """
+                MERGE (u:User {id: $user_id})
+                SET u.username = $username
+                MERGE (p:Post {id: $post_id})
+                SET p.content = $content,
+                    p.created_at = $created_at
+                MERGE (u)-[:POSTED]->(p)
+                """,
+                user_id=user_id,
+                username=post.author_username,
+                post_id=post_id,
+                content=post.content,
+                created_at=created_at,
+            )
+        driver.close()
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Post creado en Mongo, pero fallo al crear nodo/relacion en Neo4j: {e}",
+        )
+
+    # Invalidar cache del feed del autor (simplemente borrar)
+    try:
+        r = get_redis_client()
+        r.delete(f"feed:{post.author_username}")
+    except Exception:
+        # si Redis falla, no rompemos el flujo
+        pass
+
+    return PostOut(
+        id=post_id,
+        author_username=post.author_username,
+        content=post.content,
+        tags=post.tags or [],
+        created_at=created_at,
+    )
+
+@app.get("/users/{username}/feed", response_model=List[PostOut])
+def get_user_feed(username: str, limit: int = 20):
+    """
+    Feed del usuario:
+    - Usa Neo4j para obtener a quién sigue
+    - Usa Mongo para traer posts de esos usuarios + el propio
+    - Usa Redis para cachear el resultado por unos segundos
+    """
+    db = get_mongo_db()
+    users_col = db["users"]
+    posts_col = db["posts"]
+    r = None
+
+    # Intentar conectar a Redis (opcional)
+    try:
+        r = get_redis_client()
+    except Exception:
+        r = None
+
+    cache_key = f"feed:{username}"
+
+    # Intentar leer de cache
+    if r is not None:
+        cached = r.get(cache_key)
+        if cached:
+            try:
+                data = json.loads(cached)
+                # devolvemos directamente lo cacheado
+                return data
+            except Exception:
+                pass  # si falla parseo, seguimos normal
+
+    # Verificar que el usuario exista
+    user_doc = users_col.find_one({"username": username})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    user_id = str(user_doc["_id"])
+
+    # Obtener a quién sigue desde Neo4j
+    followed_usernames: List[str] = [username]  # incluimos al propio usuario
+    try:
+        driver = get_neo4j_driver()
+        with driver.session() as session:
+            result = session.run(
+                """
+                MATCH (u:User {id: $user_id})-[:FOLLOWS]->(f:User)
+                RETURN f.username AS username
+                """,
+                user_id=user_id,
+            )
+            for record in result:
+                if record["username"] and record["username"] not in followed_usernames:
+                    followed_usernames.append(record["username"])
+        driver.close()
+    except Exception as e:
+        # si Neo4j falla, solo usamos al propio user
+        # (podrías levantar 500, pero para demo es mejor degradar)
+        pass
+
+    # Traer posts desde Mongo
+    cursor = (
+        posts_col.find(
+            {"author_username": {"$in": followed_usernames}}
+        )
+        .sort("created_at", -1)
+        .limit(limit)
+    )
+
+    posts: List[PostOut] = []
+    for d in cursor:
+        posts.append(
+            PostOut(
+                id=str(d.get("_id")),
+                author_username=d.get("author_username"),
+                content=d.get("content"),
+                tags=d.get("tags") or [],
+                created_at=d.get("created_at"),
+            )
+        )
+
+    # Cachear feed en Redis por 60 segundos
+    if r is not None:
+        try:
+            r.setex(cache_key, 60, json.dumps([p.dict() for p in posts]))
+        except Exception:
+            pass
+
+    return posts

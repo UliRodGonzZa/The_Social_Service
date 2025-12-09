@@ -1,8 +1,9 @@
 import os
-from typing import Optional
+from typing import Optional, List
 
 import typer
 import requests
+import json
 
 # Puedes cambiar la URL con la variable de entorno API_URL si quieres
 API_URL = os.getenv("API_URL", "http://redk_api:8000")
@@ -81,6 +82,79 @@ def list_users():
 
     typer.echo("-" * 40)
     typer.echo(f"Total: {len(users)} usuarios")
+
+
+@app.command("create-post")
+def create_post(
+    author_username: str = typer.Argument(..., help="Username del autor"),
+    content: str = typer.Argument(..., help="Contenido del post"),
+    tags: List[str] = typer.Option(None, "--tag", "-t", help="Etiquetas opcionales"),
+):
+    """
+    Crea un post llamando a POST /posts/
+    """
+    payload = {
+        "author_username": author_username,
+        "content": content,
+        "tags": tags,
+    }
+
+    try:
+        resp = requests.post(f"{API_URL}/posts/", json=payload)
+    except Exception as e:
+        typer.echo(f"[ERROR] No se pudo conectar a la API: {e}")
+        raise typer.Exit(code=1)
+
+    if resp.status_code not in (200, 201):
+        typer.echo(f"[ERROR] La API respondió {resp.status_code}:")
+        typer.echo(resp.text)
+        raise typer.Exit(code=1)
+
+    data = resp.json()
+    typer.echo("✅ Post creado:")
+    typer.echo(f"  id       : {data.get('id')}")
+    typer.echo(f"  author   : {data.get('author_username')}")
+    typer.echo(f"  content  : {data.get('content')}")
+    typer.echo(f"  tags     : {data.get('tags')}")
+    typer.echo(f"  created  : {data.get('created_at')}")
+
+@app.command("get-feed")
+def get_feed(
+    username: str = typer.Argument(..., help="Usuario del que se quiere ver el feed"),
+    limit: int = typer.Option(20, "--limit", "-l", help="Número máximo de posts"),
+):
+    """
+    Obtiene el feed de un usuario llamando a GET /users/{username}/feed
+    """
+    params = {"limit": limit}
+    try:
+        resp = requests.get(f"{API_URL}/users/{username}/feed", params=params)
+    except Exception as e:
+        typer.echo(f"[ERROR] No se pudo conectar a la API: {e}")
+        raise typer.Exit(code=1)
+
+    if resp.status_code != 200:
+        typer.echo(f"[ERROR] La API respondió {resp.status_code}:")
+        typer.echo(resp.text)
+        raise typer.Exit(code=1)
+
+    posts = resp.json()
+    if not posts:
+        typer.echo(f"No hay posts en el feed de {username}.")
+        raise typer.Exit()
+
+    typer.echo(f"🧵 Feed de {username}:")
+    for p in posts:
+        typer.echo("-" * 60)
+        typer.echo(f"id       : {p.get('id')}")
+        typer.echo(f"author   : {p.get('author_username')}")
+        typer.echo(f"created  : {p.get('created_at')}")
+        typer.echo(f"content  : {p.get('content')}")
+        tags = p.get("tags") or []
+        if tags:
+            typer.echo(f"tags     : {', '.join(tags)}")
+    typer.echo("-" * 60)
+    typer.echo(f"Total: {len(posts)} posts")
 
 
 @app.command("follow-user")
