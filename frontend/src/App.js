@@ -41,54 +41,11 @@ function App() {
         {/* Feed Route */}
         <Route path="/feed" element={<FeedPage />} />
         
-        {/* Placeholder routes */}
-        <Route
-          path="/trending"
-          element={
-            <Layout>
-              <div className="p-8 text-center text-text-secondary">
-                <h2 className="text-2xl font-bold mb-4">📈 Trending</h2>
-                <p>Próximamente: Posts más populares</p>
-              </div>
-            </Layout>
-          }
-        />
-        
-        <Route
-          path="/discover"
-          element={
-            <Layout>
-              <div className="p-8 text-center text-text-secondary">
-                <h2 className="text-2xl font-bold mb-4">👥 Descubrir</h2>
-                <p>Próximamente: Recomendaciones de usuarios</p>
-              </div>
-            </Layout>
-          }
-        />
-        
-        <Route
-          path="/messages"
-          element={
-            <Layout>
-              <div className="p-8 text-center text-text-secondary">
-                <h2 className="text-2xl font-bold mb-4">💬 Mensajes</h2>
-                <p>Próximamente: Mensajes directos</p>
-              </div>
-            </Layout>
-          }
-        />
-        
-        <Route
-          path="/profile/:username"
-          element={
-            <Layout>
-              <div className="p-8 text-center text-text-secondary">
-                <h2 className="text-2xl font-bold mb-4">👤 Perfil</h2>
-                <p>Próximamente: Perfil de usuario</p>
-              </div>
-            </Layout>
-          }
-        />
+        {/* Feature pages */}
+        <Route path="/trending" element={<TrendingPage />} />
+        <Route path="/discover" element={<DiscoverPage />} />
+        <Route path="/messages" element={<MessagesPage />} />
+        <Route path="/profile/:username" element={<ProfilePage />} />
         
         {/* Catch all */}
         <Route path="*" element={<Navigate to="/feed" replace />} />
