@@ -81,6 +81,21 @@ export const followUser = createAsyncThunk(
   }
 );
 
+/**
+ * Dejar de seguir a un usuario
+ */
+export const unfollowUser = createAsyncThunk(
+  'profile/unfollowUser',
+  async ({ currentUsername, targetUsername }, { rejectWithValue }) => {
+    try {
+      const response = await usersAPI.unfollowUser(currentUsername, targetUsername);
+      return { targetUsername };
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.detail || 'Error al dejar de seguir');
+    }
+  }
+);
+
 // ========== SLICE ==========
 
 const profileSlice = createSlice({
