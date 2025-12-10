@@ -1,54 +1,105 @@
 /**
- * App - Aplicación principal
- * MODO DEMO: Login temporalmente deshabilitado
+ * App - Aplicación principal con autenticación
  */
 
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import { setDemoUser } from './features/auth/authSlice';
+import { useDispatch, useSelector } from 'react-redux';
+import { restoreSession } from './features/auth/authSlice';
 
 // Pages
+import AuthPage from './pages/AuthPage';
 import FeedPage from './pages/FeedPage';
 import TrendingPage from './pages/TrendingPage';
 import DiscoverPage from './pages/DiscoverPage';
 import ProfilePage from './pages/ProfilePage';
 import MessagesPage from './pages/MessagesPage';
 
+// Protected Route Component
+const ProtectedRoute = ({ children }) => {
+  const { isAuthenticated } = useSelector((state) => state.auth);
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/auth" replace />;
+  }
+  
+  return children;
+};
+
 function App() {
   const dispatch = useDispatch();
+  const { isAuthenticated } = useSelector((state) => state.auth);
 
-  // Auto-login con usuario Alice al cargar la app
+  // Restaurar sesión desde localStorage al cargar la app
   useEffect(() => {
-    const demoUser = {
-      id: "6938f6f4c4638c608cd5fc7f",
-      username: "alice",
-      email: "alice@redk.com",
-      name: "Alice Smith",
-      bio: "Full-stack developer passionate about NoSQL databases"
-    };
-    
-    // Establecer usuario demo automáticamente
-    dispatch(setDemoUser(demoUser));
+    dispatch(restoreSession());
   }, [dispatch]);
 
   return (
     <BrowserRouter>
       <Routes>
-        {/* Redirect root to feed */}
-        <Route path="/" element={<Navigate to="/feed" replace />} />
+        {/* Auth Route */}
+        <Route 
+          path="/auth" 
+          element={
+            isAuthenticated ? <Navigate to="/feed" replace /> : <AuthPage />
+          } 
+        />
         
-        {/* Feed Route */}
-        <Route path="/feed" element={<FeedPage />} />
+        {/* Redirect root to auth or feed */}
+        <Route 
+          path="/" 
+          element={<Navigate to={isAuthenticated ? "/feed" : "/auth"} replace />} 
+        />
         
-        {/* Feature pages */}
-        <Route path="/trending" element={<TrendingPage />} />
-        <Route path="/discover" element={<DiscoverPage />} />
-        <Route path="/messages" element={<MessagesPage />} />
-        <Route path="/profile/:username" element={<ProfilePage />} />
+        {/* Protected Routes */}
+        <Route 
+          path="/feed" 
+          element={
+            <ProtectedRoute>
+              <FeedPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/trending" 
+          element={
+            <ProtectedRoute>
+              <TrendingPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/discover" 
+          element={
+            <ProtectedRoute>
+              <DiscoverPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/messages" 
+          element={
+            <ProtectedRoute>
+              <MessagesPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/profile/:username" 
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          } 
+        />
         
         {/* Catch all */}
-        <Route path="*" element={<Navigate to="/feed" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
