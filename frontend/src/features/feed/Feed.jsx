@@ -15,10 +15,11 @@ const Feed = () => {
   const { posts, loading, error, mode } = useSelector((state) => state.feed);
 
   useEffect(() => {
-    if (currentUser) {
+    if (currentUser && currentUser.username) {
+      console.log('📊 Fetching feed for:', currentUser.username, 'mode:', mode);
       dispatch(fetchFeed({ username: currentUser.username, mode }));
-    }
-  }, [dispatch, currentUser, mode]);
+    } else {
+      console.warn('⚠️ No current user found');
 
   const handleModeChange = (newMode) => {
     dispatch(clearFeed());
