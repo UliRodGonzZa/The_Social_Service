@@ -5,10 +5,11 @@
 
 import axios from 'axios';
 
-// Usar directamente localhost:8001 (sin /api)
-const API_BASE_URL = 'http://localhost:8001';
+// Usar variable de entorno con fallback
+const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'https://netveil.preview.emergentagent.com';
 
 console.log('🔌 API Base URL:', API_BASE_URL);
+console.log('🔌 Environment:', process.env.REACT_APP_BACKEND_URL);
 
 // Crear instancia de axios
 const api = axios.create({
