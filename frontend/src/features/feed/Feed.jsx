@@ -14,14 +14,18 @@ const Feed = () => {
   const { currentUser } = useSelector((state) => state.auth);
   const { posts, loading, error, mode } = useSelector((state) => state.feed);
 
+  // Cargar feed cuando cambie el modo o cuando se limpie (posts.length === 0 después de crear)
   useEffect(() => {
     if (currentUser && currentUser.username) {
-      console.log('📊 Loading feed for:', currentUser.username, 'mode:', mode);
-      dispatch(fetchFeed({ username: currentUser.username, mode }));
+      // Solo cargar si no hay posts o si cambió el modo
+      if (posts.length === 0 || mode) {
+        console.log('📊 Loading feed for:', currentUser.username, 'mode:', mode);
+        dispatch(fetchFeed({ username: currentUser.username, mode }));
+      }
     } else {
       console.warn('⚠️ No current user found');
     }
-  }, [dispatch, currentUser, mode]);
+  }, [dispatch, currentUser, mode, posts.length]);
 
   const handleModeChange = (newMode) => {
     dispatch(clearFeed());
