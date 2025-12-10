@@ -10,6 +10,28 @@ import Loader from '../components/Loader';
 import { postsAPI } from '../services/api';
 
 const TrendingPage = () => {
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchTrending = async () => {
+      setLoading(true);
+      try {
+        const response = await postsAPI.getTrendingPosts(10);
+        setPosts(response.data);
+        console.log('📈 Trending posts loaded:', response.data.length);
+      } catch (error) {
+        console.error('Error loading trending:', error);
+        setError('Error al cargar trending posts');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTrending();
+  }, []);
+
   return (
     <Layout>
       <div className="min-h-screen">
@@ -22,33 +44,55 @@ const TrendingPage = () => {
         </div>
 
         {/* Content */}
-        <div className="p-8">
-          <div className="card p-6 text-center">
-            <div className="text-6xl mb-4">🚀</div>
-            <h2 className="text-2xl font-bold mb-2">Próximamente</h2>
-            <p className="text-text-secondary mb-6">
-              Sistema de trending posts con Redis Sorted Sets
-            </p>
-            
-            <div className="text-left max-w-md mx-auto space-y-3 text-sm text-text-secondary">
-              <div className="flex items-start space-x-2">
-                <span className="text-accent">✓</span>
-                <span>Redis: ZSET trending:posts (score = likes)</span>
-              </div>
-              <div className="flex items-start space-x-2">
-                <span className="text-accent">✓</span>
-                <span>Actualización en tiempo real con cada like</span>
-              </div>
-              <div className="flex items-start space-x-2">
-                <span className="text-accent">✓</span>
-                <span>Top 10 posts más likeados</span>
-              </div>
-              <div className="flex items-start space-x-2">
-                <span className="text-accent">✓</span>
-                <span>Filtros: 1h, 24h, 7d, all time</span>
+        <div>
+          {loading && <Loader text="Cargando trending posts..." />}
+          
+          {!loading && error && (
+            <div className="p-4">
+              <div className="card p-6 text-center">
+                <p className="text-danger">{error}</p>
               </div>
             </div>
-          </div>
+          )}
+          
+          {!loading && !error && posts.length === 0 && (
+            <div className="p-8">
+              <div className="card p-6 text-center">
+                <div className="text-6xl mb-4">🔥</div>
+                <h2 className="text-2xl font-bold mb-2">No hay trending posts</h2>
+                <p className="text-text-secondary mb-6">
+                  ¡Sé el primero en dar likes a los posts!
+                </p>
+                <p className="text-sm text-text-secondary">
+                  Los posts con más likes aparecerán aquí en tiempo real
+                  gracias a Redis Sorted Sets
+                </p>
+              </div>
+            </div>
+          )}
+          
+          {!loading && posts.length > 0 && (
+            <div>
+              {posts.map((post, index) => (
+                <div key={post.id} className="relative">
+                  {/* Badge de ranking */}
+                  <div className="absolute left-2 top-6 z-10">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                      index === 0 ? 'bg-yellow-500 text-black' :
+                      index === 1 ? 'bg-gray-400 text-black' :
+                      index === 2 ? 'bg-orange-600 text-white' :
+                      'bg-dark-border text-text-secondary'
+                    }`}>
+                      {index + 1}
+                    </div>
+                  </div>
+                  <div className="pl-8">
+                    <PostCard post={post} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </Layout>
