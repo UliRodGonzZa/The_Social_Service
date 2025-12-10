@@ -6,7 +6,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { login } from './features/auth/authSlice';
+import { setDemoUser } from './features/auth/authSlice';
 
 // Pages
 import FeedPage from './pages/FeedPage';
@@ -17,20 +17,16 @@ function App() {
 
   // Auto-login con usuario Alice al cargar la app
   useEffect(() => {
-    const autoLogin = async () => {
-      const demoUser = {
-        id: "6938f6f4c4638c608cd5fc7f",
-        username: "alice",
-        email: "alice@redk.com",
-        name: "Alice Smith",
-        bio: "Full-stack developer passionate about NoSQL databases"
-      };
-      
-      // Simular login exitoso
-      dispatch(login.fulfilled(demoUser));
+    const demoUser = {
+      id: "6938f6f4c4638c608cd5fc7f",
+      username: "alice",
+      email: "alice@redk.com",
+      name: "Alice Smith",
+      bio: "Full-stack developer passionate about NoSQL databases"
     };
     
-    autoLogin();
+    // Establecer usuario demo automáticamente
+    dispatch(setDemoUser(demoUser));
   }, [dispatch]);
 
   return (
