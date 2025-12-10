@@ -22,35 +22,57 @@ Basado en la revisión de código, el problema identificado es:
 - **Impacto**: Las llamadas al backend no están llegando a la URL correcta del proxy NGINX
 - **Solución esperada**: Usar la variable de entorno y asegurar que todas las rutas incluyan el prefijo `/api`
 
-## Testing Agent Invocation
+## Testing Agent Results - COMPLETED
 
-### Instructions for Testing Agent:
-Necesito que pruebes el flujo completo de creación de posts con las siguientes instrucciones:
+### Test Execution Summary:
+✅ **Test completed successfully** - Problema identificado y documentado
 
-1. **Setup**:
-   - URL: https://netveil.preview.emergentagent.com
-   - Usuario: Se carga automáticamente como "alice" (modo demo)
+### Critical Findings:
 
-2. **Test Steps**:
-   - Esperar a que la página cargue completamente
-   - Localizar el formulario de creación de posts (data-testid="create-post-form")
-   - Escribir contenido de prueba en el textarea (data-testid="create-post-content")
-   - Hacer clic en el botón "Publicar" (data-testid="create-post-submit")
-   - **CAPTURAR**: Todos los errores de consola
-   - **CAPTURAR**: Todas las peticiones de red, especialmente la llamada POST
-   - **CAPTURAR**: La respuesta del servidor (status code, body)
+#### 1. **URL de Petición POST Capturada**:
+- **URL Detectada**: `http://localhost:8001/posts/`
+- **URL Esperada**: `https://netveil.preview.emergentagent.com/api/posts/`
+- **❌ PROBLEMA CONFIRMADO**: La aplicación está usando la URL hardcodeada incorrecta
 
-3. **Expected Behavior**:
-   - La petición debería ir a: `https://netveil.preview.emergentagent.com/api/posts/`
-   - El payload debería incluir: `{ author_username: "alice", content: "...", tags: [...] }`
-   - El servidor debería responder con status 200 y el post creado
+#### 2. **Payload Enviado**:
+```json
+{
+  "author_username": "alice",
+  "content": "Este es un post de prueba para debugging", 
+  "tags": null
+}
+```
+✅ El payload es correcto y está bien formateado
 
-4. **What to Report**:
-   - URL exacta a la que se está haciendo la petición
-   - Payload enviado
-   - Status code de la respuesta
-   - Cuerpo de la respuesta (o error)
-   - Cualquier error en la consola de Javascript
+#### 3. **Errores de Red Capturados**:
+- **Error CORS**: `Access to XMLHttpRequest at 'http://localhost:8001/posts/' from origin 'https://netveil.preview.emergentagent.com' has been blocked by CORS policy`
+- **Tipo de Error**: `Permission was denied for this request to access the 'unknown' address space`
+- **Status**: `net::ERR_FAILED` (la petición nunca llega al servidor)
+
+#### 4. **Errores de Consola JavaScript**:
+- `❌ Network Error: Network Error`
+- `❌ Failed to create post: Error al crear post`
+- **Causa Raíz**: La petición se bloquea por CORS antes de llegar al backend
+
+#### 5. **Comportamiento de la UI**:
+- ✅ Formulario funciona correctamente
+- ✅ Usuario "alice" se carga automáticamente
+- ✅ Botón "Publicar" está habilitado
+- ✅ Contenido se escribe correctamente en el textarea
+- ❌ Error se muestra al usuario: "Error al crear el post"
+
+### Root Cause Analysis:
+El archivo `/app/frontend/src/services/api.js` línea 9 tiene:
+```javascript
+const API_BASE_URL = 'http://localhost:8001';
+```
+
+**Debe cambiarse a**:
+```javascript
+const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'https://netveil.preview.emergentagent.com';
+```
+
+Y todas las rutas del backend deben incluir el prefijo `/api`.
 
 ## Incorporate User Feedback
 - User confirmó el plan de acción
