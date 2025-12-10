@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 
 from pymongo import MongoClient
+from bson import ObjectId
 import redis
 from neo4j import GraphDatabase
 
