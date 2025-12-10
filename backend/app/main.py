@@ -1146,17 +1146,25 @@ def get_trending_posts(limit: int = 10):
     
     result = []
     for post_id, score in trending:
+        # Convertir bytes a string si es necesario
+        if isinstance(post_id, bytes):
+            post_id = post_id.decode('utf-8')
+        
         # Buscar post en MongoDB
-        post_doc = posts_col.find_one({"_id": ObjectId(post_id)})
-        if post_doc:
-            result.append({
-                "id": str(post_doc["_id"]),
-                "author_username": post_doc.get("author_username"),
-                "content": post_doc.get("content"),
-                "tags": post_doc.get("tags", []),
-                "created_at": post_doc.get("created_at"),
-                "likes_count": int(score)
-            })
+        try:
+            post_doc = posts_col.find_one({"_id": ObjectId(post_id)})
+            if post_doc:
+                result.append({
+                    "id": str(post_doc["_id"]),
+                    "author_username": post_doc.get("author_username"),
+                    "content": post_doc.get("content"),
+                    "tags": post_doc.get("tags", []),
+                    "created_at": post_doc.get("created_at"),
+                    "likes_count": int(score)
+                })
+        except Exception as e:
+            print(f"Error getting post {post_id}: {e}")
+            continue
     
     return result
 
