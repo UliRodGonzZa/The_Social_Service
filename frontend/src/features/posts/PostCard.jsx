@@ -1,18 +1,67 @@
 /**
  * PostCard - Tarjeta individual de post
- * Muestra contenido, autor, tags, likes, comentarios
+ * CON FUNCIONALIDAD DE LIKES
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { FiHeart, FiMessageCircle, FiShare2 } from 'react-icons/fi';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { postsAPI } from '../../services/api';
 
 const PostCard = ({ post }) => {
+  const { currentUser } = useSelector((state) => state.auth);
+  const [liked, setLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(post.likes_count || 0);
+  const [loading, setLoading] = useState(false);
+  
   const timeAgo = post.created_at
     ? formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: es })
     : '';
+
+  // Cargar estado de like al montar
+  useEffect(() => {
+    const fetchLikeStatus = async () => {
+      if (!currentUser || !post.id) return;
+      
+      try {
+        const response = await postsAPI.getPostLikes(post.id, currentUser.username);
+        setLiked(response.data.user_liked);
+        setLikesCount(response.data.likes_count);
+      } catch (error) {
+        console.error('Error fetching like status:', error);
+      }
+    };
+    
+    fetchLikeStatus();
+  }, [post.id, currentUser]);
+
+  const handleLike = async () => {
+    if (!currentUser || !post.id || loading) return;
+    
+    setLoading(true);
+    try {
+      if (liked) {
+        // Unlike
+        const response = await postsAPI.unlikePost(post.id, currentUser.username);
+        setLiked(false);
+        setLikesCount(response.data.likes_count);
+        console.log('💔 Unlike:', post.id);
+      } else {
+        // Like
+        const response = await postsAPI.likePost(post.id, currentUser.username);
+        setLiked(true);
+        setLikesCount(response.data.likes_count);
+        console.log('❤️ Like:', post.id);
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <article className="border-b border-dark-border hover:bg-dark-hover/50 transition-colors" data-testid="post-card">
@@ -65,13 +114,21 @@ const PostCard = ({ post }) => {
             
             {/* Actions */}
             <div className="mt-3 flex items-center space-x-12 text-text-secondary">
-              {/* Likes - TODO: Implementar funcionalidad */}
+              {/* Likes - FUNCIONAL */}
               <button
-                className="flex items-center space-x-2 hover:text-danger transition-colors group"
+                onClick={handleLike}
+                disabled={loading}
+                className={`flex items-center space-x-2 transition-colors group ${
+                  liked ? 'text-danger' : 'hover:text-danger'
+                }`}
                 data-testid="post-like-button"
               >
-                <FiHeart className="w-5 h-5 group-hover:fill-danger" />
-                <span className="text-sm">0</span>
+                <FiHeart 
+                  className={`w-5 h-5 transition-all ${
+                    liked ? 'fill-danger' : 'group-hover:fill-danger'
+                  }`}
+                />
+                <span className="text-sm">{likesCount}</span>
               </button>
               
               {/* Comments - TODO: Implementar */}
