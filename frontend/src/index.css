@@ -47,6 +47,10 @@ code {
     @apply bg-transparent hover:bg-dark-hover border border-dark-border text-text-primary font-bold py-2 px-4 rounded-full transition-colors duration-200;
   }
   
+  .btn-danger {
+    @apply bg-transparent hover:bg-red-600 border border-red-600 text-red-600 hover:text-white font-bold py-2 px-4 rounded-full transition-colors duration-200;
+  }
+  
   .card {
     @apply bg-dark-card border border-dark-border rounded-xl;
   }
