@@ -20,6 +20,8 @@ const Feed = () => {
       dispatch(fetchFeed({ username: currentUser.username, mode }));
     } else {
       console.warn('⚠️ No current user found');
+    }
+  }, [dispatch, currentUser, mode]);
 
   const handleModeChange = (newMode) => {
     dispatch(clearFeed());
