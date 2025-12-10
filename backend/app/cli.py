@@ -5,7 +5,7 @@ import typer
 import requests
 import json
 
-API_URL = os.getenv("API_URL", "http://redk_api:8000")
+API_URL = os.getenv("API_URL", "http://127.0.0.1:8001/api")
 
 app = typer.Typer(help="CLI para la red social Red K")
 
@@ -295,6 +295,7 @@ def list_dm_conversations(
     typer.echo("-" * 60)
     typer.echo(f"Total: {len(convs)} conversaciones")
 
+@app.command("suggest-users")
 @app.command("get-suggestions")
 def get_suggestions(
     username: str = typer.Argument(..., help="Usuario para el que se quieren sugerencias"),
