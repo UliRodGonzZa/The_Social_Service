@@ -67,6 +67,8 @@ export const usersAPI = {
   listUsers: () => api.get('/api/users/'),
   followUser: (username, targetUsername) => 
     api.post(`/api/users/${username}/follow/${targetUsername}`),
+  unfollowUser: (username, targetUsername) => 
+    api.delete(`/api/users/${username}/follow/${targetUsername}`),
   getFollowing: (username) => api.get(`/api/users/${username}/following`),
   getSuggestions: (username, limit = 10) => 
     api.get(`/api/users/${username}/suggestions`, { params: { limit } }),
