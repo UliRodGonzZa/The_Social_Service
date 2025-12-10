@@ -57,51 +57,51 @@ api.interceptors.response.use(
 
 // ========== AUTH API ==========
 export const authAPI = {
-  register: (userData) => api.post('/users/', userData),
-  login: (username) => api.get(`/users/by-username/${username}`),
-  getUserByUsername: (username) => api.get(`/users/by-username/${username}`),
+  register: (userData) => api.post('/api/users/', userData),
+  login: (username) => api.get(`/api/users/by-username/${username}`),
+  getUserByUsername: (username) => api.get(`/api/users/by-username/${username}`),
 };
 
 // ========== USERS API ==========
 export const usersAPI = {
-  listUsers: () => api.get('/users/'),
+  listUsers: () => api.get('/api/users/'),
   followUser: (username, targetUsername) => 
-    api.post(`/users/${username}/follow/${targetUsername}`),
-  getFollowing: (username) => api.get(`/users/${username}/following`),
+    api.post(`/api/users/${username}/follow/${targetUsername}`),
+  getFollowing: (username) => api.get(`/api/users/${username}/following`),
   getSuggestions: (username, limit = 10) => 
-    api.get(`/users/${username}/suggestions`, { params: { limit } }),
+    api.get(`/api/users/${username}/suggestions`, { params: { limit } }),
 };
 
 // ========== POSTS API ==========
 export const postsAPI = {
-  // Crear post: POST /posts/
-  createPost: (postData) => api.post('/posts/', postData),
+  // Crear post: POST /api/posts/
+  createPost: (postData) => api.post('/api/posts/', postData),
   
-  // Obtener feed: GET /users/{username}/feed
+  // Obtener feed: GET /api/users/{username}/feed
   getFeed: (username, mode = 'all', limit = 20) => 
-    api.get(`/users/${username}/feed`, { params: { mode, limit } }),
+    api.get(`/api/users/${username}/feed`, { params: { mode, limit } }),
   
   // Like/Unlike post
   likePost: (postId, username) => 
-    api.post(`/posts/${postId}/like`, null, { params: { username } }),
+    api.post(`/api/posts/${postId}/like`, null, { params: { username } }),
   
   unlikePost: (postId, username) => 
-    api.delete(`/posts/${postId}/like`, { params: { username } }),
+    api.delete(`/api/posts/${postId}/like`, { params: { username } }),
   
   getPostLikes: (postId, username = null) => 
-    api.get(`/posts/${postId}/likes`, { params: { username } }),
+    api.get(`/api/posts/${postId}/likes`, { params: { username } }),
   
   // Trending posts
   getTrendingPosts: (limit = 10) => 
-    api.get('/trending/posts', { params: { limit } }),
+    api.get('/api/trending/posts', { params: { limit } }),
 };
 
 // ========== DMS API ==========
 export const dmsAPI = {
-  sendDM: (dmData) => api.post('/dm/send', dmData),
+  sendDM: (dmData) => api.post('/api/dm/send', dmData),
   getConversation: (username, otherUsername, limit = 50) => 
-    api.get(`/dm/${username}/${otherUsername}`, { params: { limit } }),
-  listConversations: (username) => api.get(`/dm/conversations/${username}`),
+    api.get(`/api/dm/${username}/${otherUsername}`, { params: { limit } }),
+  listConversations: (username) => api.get(`/api/dm/conversations/${username}`),
 };
 
 export default api;
