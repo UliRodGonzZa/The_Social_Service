@@ -17,6 +17,7 @@ import {
   fetchUserPosts, 
   fetchFollowing,
   followUser,
+  unfollowUser,
   clearProfile 
 } from '../features/profile/profileSlice';
 import Loader from '../components/Loader';
@@ -45,13 +46,22 @@ const ProfilePage = () => {
     }
   }, [dispatch, username, currentUser]);
 
-  const handleFollow = async () => {
+  const handleFollowToggle = async () => {
     if (!currentUser?.username) return;
     
-    await dispatch(followUser({
-      currentUsername: currentUser.username,
-      targetUsername: username
-    }));
+    if (isFollowing) {
+      // Dejar de seguir
+      await dispatch(unfollowUser({
+        currentUsername: currentUser.username,
+        targetUsername: username
+      }));
+    } else {
+      // Seguir
+      await dispatch(followUser({
+        currentUsername: currentUser.username,
+        targetUsername: username
+      }));
+    }
     
     // Recargar following
     dispatch(fetchFollowing(currentUser.username));
@@ -113,11 +123,12 @@ const ProfilePage = () => {
               </div>
               {!isOwnProfile && (
                 <button 
-                  onClick={handleFollow}
-                  disabled={loading || isFollowing}
-                  className={isFollowing ? "btn-secondary" : "btn-primary"}
+                  onClick={handleFollowToggle}
+                  disabled={loading}
+                  className={isFollowing ? "btn-secondary hover:btn-danger transition-colors" : "btn-primary"}
+                  data-testid={isFollowing ? "unfollow-button" : "follow-button"}
                 >
-                  {isFollowing ? 'Siguiendo' : 'Seguir'}
+                  {loading ? 'Cargando...' : (isFollowing ? 'Siguiendo' : 'Seguir')}
                 </button>
               )}
             </div>
