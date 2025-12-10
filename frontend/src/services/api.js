@@ -79,6 +79,20 @@ export const postsAPI = {
   // Obtener feed: GET /users/{username}/feed
   getFeed: (username, mode = 'all', limit = 20) => 
     api.get(`/users/${username}/feed`, { params: { mode, limit } }),
+  
+  // Like/Unlike post
+  likePost: (postId, username) => 
+    api.post(`/posts/${postId}/like`, null, { params: { username } }),
+  
+  unlikePost: (postId, username) => 
+    api.delete(`/posts/${postId}/like`, { params: { username } }),
+  
+  getPostLikes: (postId, username = null) => 
+    api.get(`/posts/${postId}/likes`, { params: { username } }),
+  
+  // Trending posts
+  getTrendingPosts: (limit = 10) => 
+    api.get('/trending/posts', { params: { limit } }),
 };
 
 // ========== DMS API ==========
