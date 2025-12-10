@@ -1,97 +1,98 @@
 /**
  * App - Aplicación principal
- * Router y protección de rutas
+ * MODO DEMO: Login temporalmente deshabilitado
  */
 
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
-import { restoreSession } from './features/auth/authSlice';
+import { useDispatch } from 'react-redux';
+import { login } from './features/auth/authSlice';
 
 // Pages
-import AuthPage from './pages/AuthPage';
 import FeedPage from './pages/FeedPage';
-
-// Protected Route wrapper
-const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated } = useSelector((state) => state.auth);
-  
-  if (!isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
-  
-  return children;
-};
+import Layout from './components/Layout';
 
 function App() {
   const dispatch = useDispatch();
-  const { isAuthenticated } = useSelector((state) => state.auth);
 
-  // Restaurar sesión desde localStorage al cargar
+  // Auto-login con usuario Alice al cargar la app
   useEffect(() => {
-    dispatch(restoreSession());
+    const autoLogin = async () => {
+      const demoUser = {
+        id: "6938f6f4c4638c608cd5fc7f",
+        username: "alice",
+        email: "alice@redk.com",
+        name: "Alice Smith",
+        bio: "Full-stack developer passionate about NoSQL databases"
+      };
+      
+      // Simular login exitoso
+      dispatch(login.fulfilled(demoUser));
+    };
+    
+    autoLogin();
   }, [dispatch]);
 
   return (
     <BrowserRouter>
       <Routes>
-        {/* Auth Route */}
-        <Route
-          path="/"
-          element={
-            isAuthenticated ? <Navigate to="/feed" replace /> : <AuthPage />
-          }
-        />
+        {/* Redirect root to feed */}
+        <Route path="/" element={<Navigate to="/feed" replace />} />
         
-        {/* Protected Routes */}
-        <Route
-          path="/feed"
-          element={
-            <ProtectedRoute>
-              <FeedPage />
-            </ProtectedRoute>
-          }
-        />
+        {/* Feed Route */}
+        <Route path="/feed" element={<FeedPage />} />
         
-        {/* Placeholder routes - TODO: Implementar */}
+        {/* Placeholder routes */}
         <Route
           path="/trending"
           element={
-            <ProtectedRoute>
-              <div className="p-8 text-center">Trending - Próximamente</div>
-            </ProtectedRoute>
+            <Layout>
+              <div className="p-8 text-center text-text-secondary">
+                <h2 className="text-2xl font-bold mb-4">📈 Trending</h2>
+                <p>Próximamente: Posts más populares</p>
+              </div>
+            </Layout>
           }
         />
         
         <Route
           path="/discover"
           element={
-            <ProtectedRoute>
-              <div className="p-8 text-center">Descubrir - Próximamente</div>
-            </ProtectedRoute>
+            <Layout>
+              <div className="p-8 text-center text-text-secondary">
+                <h2 className="text-2xl font-bold mb-4">👥 Descubrir</h2>
+                <p>Próximamente: Recomendaciones de usuarios</p>
+              </div>
+            </Layout>
           }
         />
         
         <Route
           path="/messages"
           element={
-            <ProtectedRoute>
-              <div className="p-8 text-center">Mensajes - Próximamente</div>
-            </ProtectedRoute>
+            <Layout>
+              <div className="p-8 text-center text-text-secondary">
+                <h2 className="text-2xl font-bold mb-4">💬 Mensajes</h2>
+                <p>Próximamente: Mensajes directos</p>
+              </div>
+            </Layout>
           }
         />
         
         <Route
           path="/profile/:username"
           element={
-            <ProtectedRoute>
-              <div className="p-8 text-center">Perfil - Próximamente</div>
-            </ProtectedRoute>
+            <Layout>
+              <div className="p-8 text-center text-text-secondary">
+                <h2 className="text-2xl font-bold mb-4">👤 Perfil</h2>
+                <p>Próximamente: Perfil de usuario</p>
+              </div>
+            </Layout>
           }
         />
         
         {/* Catch all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/feed" replace />} />
       </Routes>
     </BrowserRouter>
   );
