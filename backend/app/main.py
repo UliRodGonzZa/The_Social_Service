@@ -337,6 +337,65 @@ def follow_user(username: str, target_username: str):
 
     return {"message": f"{username} ahora sigue a {target_username}"}
 
+
+@app.delete("/users/{username}/follow/{target_username}")
+def unfollow_user(username: str, target_username: str):
+    """
+    Elimina la relación FOLLOWS entre dos usuarios:
+    (username) -[:FOLLOWS]-> (target_username)
+    """
+    if username == target_username:
+        raise HTTPException(status_code=400, detail="No puedes dejar de seguirte a ti mismo")
+
+    db = get_mongo_db()
+    users_col = db["users"]
+
+    # Verificar que ambos existen en Mongo
+    user_doc = users_col.find_one({"username": username})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Usuario origen no existe")
+
+    target_doc = users_col.find_one({"username": target_username})
+    if not target_doc:
+        raise HTTPException(status_code=404, detail="Usuario destino no existe")
+
+    user_id = str(user_doc["_id"])
+    target_id = str(target_doc["_id"])
+
+    # Eliminar relación en Neo4j
+    try:
+        driver = get_neo4j_driver()
+        with driver.session() as session:
+            result = session.run(
+                """
+                MATCH (u:User {id: $user_id})-[r:FOLLOWS]->(t:User {id: $target_id})
+                DELETE r
+                RETURN count(r) as deleted_count
+                """,
+                user_id=user_id,
+                target_id=target_id,
+            )
+            record = result.single()
+            deleted_count = record["deleted_count"] if record else 0
+            
+            if deleted_count == 0:
+                raise HTTPException(
+                    status_code=404, 
+                    detail=f"{username} no sigue a {target_username}"
+                )
+        
+        driver.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al eliminar relación FOLLOWS en Neo4j: {e}",
+        )
+
+    return {"message": f"{username} dejó de seguir a {target_username}"}
+
+
 class FollowingOut(BaseModel):
     username: str
     name: Optional[str] = None
