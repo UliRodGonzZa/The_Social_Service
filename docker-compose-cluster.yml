@@ -1,0 +1,258 @@
+version: "3.9"
+
+services:
+  # ========== API Backend ==========
+  api:
+    build: ./backend
+    container_name: redk_api
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongo
+      - neo4j
+      - redis-master-1
+      - redis-master-2
+      - redis-master-3
+    volumes:
+      - ./backend:/code
+    networks:
+      - redk_network
+
+  # ========== MongoDB ==========
+  mongo:
+    image: mongo:7
+    container_name: redk_mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - redk_network
+
+  # ========== Neo4j ==========
+  neo4j:
+    image: neo4j:5
+    container_name: redk_neo4j
+    restart: unless-stopped
+    environment:
+      - NEO4J_AUTH=neo4j/password123
+    ports:
+      - "8474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    networks:
+      - redk_network
+
+  # ========== REDIS CLUSTER - MASTERS ==========
+  
+  redis-master-1:
+    image: redis:7
+    container_name: redis-master-1
+    command: >
+      redis-server
+      --port 7000
+      --cluster-enabled yes
+      --cluster-config-file nodes-7000.conf
+      --cluster-node-timeout 15000
+      --appendonly yes
+      --appendfilename "appendonly-7000.aof"
+      --dir /data
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "7000:7000"
+      - "17000:17000"  # Cluster bus port
+    volumes:
+      - redis_master_1_data:/data
+    networks:
+      - redk_network
+
+  redis-master-2:
+    image: redis:7
+    container_name: redis-master-2
+    command: >
+      redis-server
+      --port 7001
+      --cluster-enabled yes
+      --cluster-config-file nodes-7001.conf
+      --cluster-node-timeout 15000
+      --appendonly yes
+      --appendfilename "appendonly-7001.aof"
+      --dir /data
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "7001:7001"
+      - "17001:17001"
+    volumes:
+      - redis_master_2_data:/data
+    networks:
+      - redk_network
+
+  redis-master-3:
+    image: redis:7
+    container_name: redis-master-3
+    command: >
+      redis-server
+      --port 7002
+      --cluster-enabled yes
+      --cluster-config-file nodes-7002.conf
+      --cluster-node-timeout 15000
+      --appendonly yes
+      --appendfilename "appendonly-7002.aof"
+      --dir /data
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "7002:7002"
+      - "17002:17002"
+    volumes:
+      - redis_master_3_data:/data
+    networks:
+      - redk_network
+
+  # ========== REDIS CLUSTER - REPLICAS ==========
+
+  redis-replica-1:
+    image: redis:7
+    container_name: redis-replica-1
+    command: >
+      redis-server
+      --port 7003
+      --cluster-enabled yes
+      --cluster-config-file nodes-7003.conf
+      --cluster-node-timeout 15000
+      --appendonly yes
+      --appendfilename "appendonly-7003.aof"
+      --dir /data
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "7003:7003"
+      - "17003:17003"
+    volumes:
+      - redis_replica_1_data:/data
+    networks:
+      - redk_network
+
+  redis-replica-2:
+    image: redis:7
+    container_name: redis-replica-2
+    command: >
+      redis-server
+      --port 7004
+      --cluster-enabled yes
+      --cluster-config-file nodes-7004.conf
+      --cluster-node-timeout 15000
+      --appendonly yes
+      --appendfilename "appendonly-7004.aof"
+      --dir /data
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "7004:7004"
+      - "17004:17004"
+    volumes:
+      - redis_replica_2_data:/data
+    networks:
+      - redk_network
+
+  redis-replica-3:
+    image: redis:7
+    container_name: redis-replica-3
+    command: >
+      redis-server
+      --port 7005
+      --cluster-enabled yes
+      --cluster-config-file nodes-7005.conf
+      --cluster-node-timeout 15000
+      --appendonly yes
+      --appendfilename "appendonly-7005.aof"
+      --dir /data
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "7005:7005"
+      - "17005:17005"
+    volumes:
+      - redis_replica_3_data:/data
+    networks:
+      - redk_network
+
+  # ========== CLUSTER INITIALIZER ==========
+  redis-cluster-init:
+    image: redis:7
+    container_name: redis-cluster-init
+    depends_on:
+      - redis-master-1
+      - redis-master-2
+      - redis-master-3
+      - redis-replica-1
+      - redis-replica-2
+      - redis-replica-3
+    command: >
+      sh -c "
+        echo 'Esperando a que los nodos estén listos...'
+        sleep 10
+        
+        echo 'Creando Redis Cluster con 3 masters + 3 replicas...'
+        redis-cli --cluster create \
+          redis-master-1:7000 \
+          redis-master-2:7001 \
+          redis-master-3:7002 \
+          redis-replica-1:7003 \
+          redis-replica-2:7004 \
+          redis-replica-3:7005 \
+          --cluster-replicas 1 \
+          --cluster-yes
+        
+        echo 'Verificando cluster...'
+        redis-cli -c -h redis-master-1 -p 7000 CLUSTER INFO
+        redis-cli -c -h redis-master-1 -p 7000 CLUSTER NODES
+        
+        echo 'Redis Cluster inicializado correctamente!'
+        echo 'Masters: 7000, 7001, 7002'
+        echo 'Replicas: 7003, 7004, 7005'
+      "
+    networks:
+      - redk_network
+
+  # ========== CLI ==========
+  cli:
+    build: ./backend
+    container_name: redk_cli
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - API_URL=http://redk_api:8000
+    depends_on:
+      - api
+    entrypoint: ["sleep", "infinity"]
+    volumes:
+      - ./backend:/code
+    networks:
+      - redk_network
+
+# ========== VOLUMES ==========
+volumes:
+  mongo_data:
+  neo4j_data:
+  neo4j_logs:
+  redis_master_1_data:
+  redis_master_2_data:
+  redis_master_3_data:
+  redis_replica_1_data:
+  redis_replica_2_data:
+  redis_replica_3_data:
+
+# ========== NETWORK ==========
+networks:
+  redk_network:
+    driver: bridge
