@@ -159,6 +159,24 @@ const profileSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       });
+
+    // UNFOLLOW USER
+    builder
+      .addCase(unfollowUser.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(unfollowUser.fulfilled, (state, action) => {
+        state.loading = false;
+        state.isFollowing = false;
+        // Remover del array de following
+        state.following = state.following.filter(
+          user => user.username !== action.payload.targetUsername
+        );
+      })
+      .addCase(unfollowUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
   },
 });
 
