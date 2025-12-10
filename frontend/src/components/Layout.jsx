@@ -5,11 +5,13 @@
 
 import React from 'react';
 import Navbar from './Navbar';
+import DemoNotice from './DemoNotice';
 
 const Layout = ({ children, showSidebar = false, sidebar = null }) => {
   return (
     <div className="min-h-screen bg-dark-bg">
       <Navbar />
+      <DemoNotice />
       
       <div className="ml-64 flex">
         {/* Main Content */}
