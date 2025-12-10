@@ -1,14 +1,13 @@
 /**
  * TrendingPage - Posts trending (más populares)
- * 
- * INTEGRACIÓN NOSQL:
- * - Redis Cluster: ZREVRANGE trending:posts 0 9
- * - Sorted set con score = likes count
- * - Actualizado en tiempo real con cada like
+ * FUNCIONAL con Redis Sorted Sets
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
+import PostCard from '../features/posts/PostCard';
+import Loader from '../components/Loader';
+import { postsAPI } from '../services/api';
 
 const TrendingPage = () => {
   return (
