@@ -99,3 +99,27 @@ Y todas las rutas del backend deben incluir el prefijo `/api`.
 - ✅ Screenshots del estado de error
 
 **Next Action**: Main agent debe implementar el fix identificado en el archivo API service.
+
+---
+
+## Fix Implementation - COMPLETED
+
+### Changes Made:
+1. ✅ Modificado `/app/frontend/src/services/api.js` línea 9:
+   - **Antes**: `const API_BASE_URL = 'http://localhost:8001';`
+   - **Después**: `const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'https://netveil.preview.emergentagent.com';`
+
+2. ✅ Agregado prefijo `/api` a todas las rutas:
+   - authAPI: `/api/users/`, `/api/users/by-username/...`
+   - usersAPI: `/api/users/`, `/api/users/{username}/...`
+   - postsAPI: `/api/posts/`, `/api/users/{username}/feed`, `/api/trending/posts`
+   - dmsAPI: `/api/dm/...`
+
+3. ✅ Frontend reiniciado con `supervisorctl restart frontend`
+
+### Status:
+- Frontend service: ✅ RUNNING (pid 763)
+- Expected behavior: Peticiones POST ahora deberían ir a `https://netveil.preview.emergentagent.com/api/posts/`
+
+### Next Test:
+Verificar que el fix funciona correctamente usando frontend testing agent.
