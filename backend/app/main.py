@@ -64,8 +64,33 @@ class SuggestionOut(BaseModel):
     name: Optional[str] = None
     bio: Optional[str] = None
     email: Optional[str] = None
-    score: int
+    score: float
     reason: Optional[str] = None
+    mutual_connections: int = 0
+    followers_count: int = 0
+    posts_count: int = 0
+
+class DMCreate(BaseModel):
+    sender_username: str
+    receiver_username: str
+    content: str
+
+
+class DMOut(BaseModel):
+    id: str
+    sender_username: str
+    receiver_username: str
+    content: str
+    created_at: str  # ISO string
+    read: bool
+    read_at: Optional[str] = None
+
+
+class DMConversationSummary(BaseModel):
+    with_username: str
+    last_message_content: str
+    last_message_at: str  # ISO
+    unread_count: int
 
 # --------- Helpers de DB (simples, por-request) ---------
 
@@ -411,13 +436,11 @@ def create_post(post: PostCreate):
             status_code=500,
             detail=f"Post creado en Mongo, pero fallo al crear nodo/relacion en Neo4j: {e}",
         )
-
-    # Invalidar cache del feed del autor (simplemente borrar)
+    
     try:
         r = get_redis_client()
         r.delete(f"feed:{post.author_username}")
     except Exception:
-        # si Redis falla, no rompemos el flujo
         pass
 
     return PostOut(
@@ -509,7 +532,6 @@ def get_user_feed(username: str, limit: int = 20):
             )
         )
 
-    # Cachear feed en Redis por 60 segundos
     if r is not None:
         try:
             r.setex(cache_key, 60, json.dumps([p.dict() for p in posts]))
@@ -619,7 +641,6 @@ def get_user_feed(
             )
         )
 
-    # Cachear feed en Redis por 60 segundos
     if r is not None:
         try:
             r.setex(cache_key, 60, json.dumps([p.dict() for p in posts]))
@@ -632,8 +653,11 @@ def get_user_feed(
 def get_suggestions(username: str, limit: int = 10):
     """
     Sugerencias de usuarios a seguir usando Neo4j:
-    - "Amigos de tus amigos" que aún no sigues (2-hop)
-    - Se ordenan por score = número de caminos 2-hop
+    - "Amigos de tus amigos" (2-hop) que aún no sigues
+    - Se ordenan por un score que combina:
+        * mutual_connections (cuántos amigos en común)
+        * followers_count    (cuánta gente los sigue)
+        * posts_count        (actividad)
     """
     db = get_mongo_db()
     users_col = db["users"]
@@ -649,22 +673,45 @@ def get_suggestions(username: str, limit: int = 10):
     try:
         driver = get_neo4j_driver()
         with driver.session() as session:
+            # 1) Encontrar "amigos de tus amigos" que aún no sigues
             result = session.run(
                 """
+                // u = usuario base
                 MATCH (u:User {id: $user_id})-[:FOLLOWS]->(:User)-[:FOLLOWS]->(s:User)
                 WHERE s.id <> $user_id
                   AND NOT (u)-[:FOLLOWS]->(s)
-                RETURN s.username AS username,
-                       s.name AS name,
-                       s.bio AS bio,
-                       s.email AS email,
-                       COUNT(*) AS score
+                WITH u, s, COUNT(*) AS mutual_connections
+
+                // 2) Contar followers de s
+                OPTIONAL MATCH (s)<-[:FOLLOWS]-(:User)
+                WITH u, s, mutual_connections, COUNT(*) AS followers_count
+
+                // 3) Contar posts de s
+                OPTIONAL MATCH (s)-[:POSTED]->(:Post)
+                WITH s,
+                     mutual_connections,
+                     followers_count,
+                     COUNT(*) AS posts_count
+
+                // 4) Calcular score compuesto
+                RETURN
+                    s.username AS username,
+                    s.name AS name,
+                    s.bio AS bio,
+                    s.email AS email,
+                    mutual_connections,
+                    followers_count,
+                    posts_count,
+                    (mutual_connections * 3.0
+                     + followers_count * 2.0
+                     + posts_count * 1.0) AS score
                 ORDER BY score DESC, username ASC
                 LIMIT $limit
                 """,
                 user_id=user_id,
                 limit=limit,
             )
+
             for record in result:
                 suggestions.append(
                     SuggestionOut(
@@ -673,20 +720,21 @@ def get_suggestions(username: str, limit: int = 10):
                         bio=record.get("bio"),
                         email=record.get("email"),
                         score=record["score"],
-                        reason="Amigos de tus amigos",
+                        reason="Amigos de tus amigos + actividad",
+                        mutual_connections=record["mutual_connections"],
+                        followers_count=record["followers_count"],
+                        posts_count=record["posts_count"],
                     )
                 )
         driver.close()
     except Exception as e:
-        # si Neo4j falla, devolvemos vacío (o podríamos hacer fallback a Mongo)
+        # si Neo4j falla, error 
         raise HTTPException(
             status_code=500,
             detail=f"Error al consultar sugerencias en Neo4j: {e}",
         )
 
-    # Si no hay sugerencias basadas en grafo, opcionalmente podemos hacer fallback
     if not suggestions:
-        # Fallback simple: usuarios aleatorios de Mongo que no sea él mismo
         docs = (
             users_col.find({"username": {"$ne": username}})
             .limit(limit)
@@ -698,9 +746,213 @@ def get_suggestions(username: str, limit: int = 10):
                     name=d.get("name"),
                     bio=d.get("bio"),
                     email=d.get("email"),
-                    score=1,
+                    score=1.0,
                     reason="Usuarios aleatorios (sin datos de grafo suficientes)",
+                    mutual_connections=0,
+                    followers_count=0,
+                    posts_count=0,
                 )
             )
 
     return suggestions
+
+@app.post("/dm/send", response_model=DMOut)
+def send_dm(dm: DMCreate):
+    """
+    Envía un DM:
+    - Guarda en Mongo (colección `dms`)
+    - Crea/actualiza relación (:User)-[:MESSAGED]->(:User) en Neo4j
+    """
+    db = get_mongo_db()
+    users_col = db["users"]
+    dms_col = db["dms"]
+
+    # Verificar que ambos usuarios existan
+    sender_doc = users_col.find_one({"username": dm.sender_username})
+    if not sender_doc:
+        raise HTTPException(status_code=404, detail="Sender no existe")
+
+    receiver_doc = users_col.find_one({"username": dm.receiver_username})
+    if not receiver_doc:
+        raise HTTPException(status_code=404, detail="Receiver no existe")
+
+    created_at = datetime.utcnow().isoformat()
+
+    # Clave de conversación (ordenada alfabéticamente)
+    u1, u2 = sorted([dm.sender_username, dm.receiver_username])
+    conversation_key = f"{u1}::{u2}"
+
+    doc = {
+        "sender_username": dm.sender_username,
+        "receiver_username": dm.receiver_username,
+        "content": dm.content,
+        "created_at": created_at,
+        "read": False,
+        "read_at": None,
+        "conversation_key": conversation_key,
+    }
+
+    result = dms_col.insert_one(doc)
+    dm_id = str(result.inserted_id)
+
+    # Relación en Neo4j
+    try:
+        driver = get_neo4j_driver()
+        with driver.session() as session:
+            session.run(
+                """
+                MERGE (s:User {username: $sender})
+                MERGE (r:User {username: $receiver})
+                MERGE (s)-[rel:MESSAGED]->(r)
+                ON CREATE SET rel.last_message_at = $created_at
+                ON MATCH SET  rel.last_message_at = $created_at
+                """,
+                sender=dm.sender_username,
+                receiver=dm.receiver_username,
+                created_at=created_at,
+            )
+        driver.close()
+    except Exception:
+        # No tiramos error de API si Neo4j falla; el mensaje ya quedó guardado
+        pass
+
+    return DMOut(
+        id=dm_id,
+        sender_username=dm.sender_username,
+        receiver_username=dm.receiver_username,
+        content=dm.content,
+        created_at=created_at,
+        read=False,
+        read_at=None,
+    )
+
+@app.get("/dm/{username}/{other_username}", response_model=List[DMOut])
+def get_conversation(
+    username: str,
+    other_username: str,
+    limit: int = 50,
+    mark_read: bool = True,
+):
+    """
+    Devuelve la conversación entre `username` y `other_username`.
+    - Muestra mensajes en orden cronológico ascendente.
+    - Opcionalmente marca como leídos los mensajes donde receiver = `username`.
+    """
+    db = get_mongo_db()
+    users_col = db["users"]
+    dms_col = db["dms"]
+
+    # Verificar que ambos usuarios existan
+    if not users_col.find_one({"username": username}):
+        raise HTTPException(status_code=404, detail="Usuario no existe")
+
+    if not users_col.find_one({"username": other_username}):
+        raise HTTPException(status_code=404, detail="Otro usuario no existe")
+
+    u1, u2 = sorted([username, other_username])
+    conversation_key = f"{u1}::{u2}"
+
+    cursor = (
+        dms_col.find({"conversation_key": conversation_key})
+        .sort("created_at", 1)
+        .limit(limit)
+    )
+
+    docs = list(cursor)
+
+    # Marcar como leídos los mensajes entrantes
+    if mark_read and docs:
+        now_iso = datetime.utcnow().isoformat()
+        dms_col.update_many(
+            {
+                "conversation_key": conversation_key,
+                "receiver_username": username,
+                "read": False,
+            },
+            {"$set": {"read": True, "read_at": now_iso}},
+        )
+
+        # Actualizamos en memoria los que corresponda
+        for d in docs:
+            if d.get("receiver_username") == username and not d.get("read"):
+                d["read"] = True
+                d["read_at"] = now_iso
+
+    messages: List[DMOut] = []
+    for d in docs:
+        messages.append(
+            DMOut(
+                id=str(d.get("_id")),
+                sender_username=d.get("sender_username"),
+                receiver_username=d.get("receiver_username"),
+                content=d.get("content"),
+                created_at=d.get("created_at"),
+                read=d.get("read", False),
+                read_at=d.get("read_at"),
+            )
+        )
+
+    return messages
+
+@app.get("/dm/conversations/{username}", response_model=List[DMConversationSummary])
+def list_conversations(username: str):
+    """
+    Lista las conversaciones en las que participa `username`,
+    con:
+    - último mensaje
+    - timestamp del último mensaje
+    - número de mensajes no leídos
+    """
+    db = get_mongo_db()
+    users_col = db["users"]
+    dms_col = db["dms"]
+
+    if not users_col.find_one({"username": username}):
+        raise HTTPException(status_code=404, detail="Usuario no existe")
+
+    # Traemos todos los mensajes donde participa
+    cursor = dms_col.find(
+        {
+            "$or": [
+                {"sender_username": username},
+                {"receiver_username": username},
+            ]
+        }
+    )
+
+    convs: dict[str, DMConversationSummary] = {}
+
+    for d in cursor:
+        sender = d.get("sender_username")
+        receiver = d.get("receiver_username")
+        content = d.get("content")
+        created_at = d.get("created_at")
+        read = d.get("read", False)
+
+        other = receiver if sender == username else sender
+        if other is None:
+            continue
+
+        # Si no existe, inicializamos
+        if other not in convs:
+            convs[other] = DMConversationSummary(
+                with_username=other,
+                last_message_content=content,
+                last_message_at=created_at,
+                unread_count=0,
+            )
+        else:
+            # Si este mensaje es más reciente, actualizamos último
+            if created_at > convs[other].last_message_at:
+                convs[other].last_message_at = created_at
+                convs[other].last_message_content = content
+
+        # Contabilizar no leídos entrantes
+        if receiver == username and not read:
+            convs[other].unread_count += 1
+
+    # Ordenar por último mensaje 
+    summaries = list(convs.values())
+    summaries.sort(key=lambda c: c.last_message_at, reverse=True)
+
+    return summaries

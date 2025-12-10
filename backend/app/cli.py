@@ -5,7 +5,6 @@ import typer
 import requests
 import json
 
-# Puedes cambiar la URL con la variable de entorno API_URL si quieres
 API_URL = os.getenv("API_URL", "http://redk_api:8000")
 
 app = typer.Typer(help="CLI para la red social Red K")
@@ -111,7 +110,7 @@ def create_post(
         raise typer.Exit(code=1)
 
     data = resp.json()
-    typer.echo("✅ Post creado:")
+    typer.echo("Post creado:")
     typer.echo(f"  id       : {data.get('id')}")
     typer.echo(f"  author   : {data.get('author_username')}")
     typer.echo(f"  content  : {data.get('content')}")
@@ -175,6 +174,127 @@ def list_following(
     typer.echo("-" * 40)
     typer.echo(f"Total: {len(people)} usuarios seguidos")
 
+@app.command("send-dm")
+def send_dm(
+    sender_username: str = typer.Argument(..., help="Usuario que envía el mensaje"),
+    receiver_username: str = typer.Argument(..., help="Usuario que recibe el mensaje"),
+    content: str = typer.Argument(..., help="Contenido del mensaje"),
+):
+    """
+    Envía un DM usando POST /dm/send
+    """
+    payload = {
+        "sender_username": sender_username,
+        "receiver_username": receiver_username,
+        "content": content,
+    }
+
+    try:
+        resp = requests.post(f"{API_URL}/dm/send", json=payload)
+    except Exception as e:
+        typer.echo(f"[ERROR] No se pudo conectar a la API: {e}")
+        raise typer.Exit(code=1)
+
+    if resp.status_code not in (200, 201):
+        typer.echo(f"[ERROR] La API respondió {resp.status_code}:")
+        typer.echo(resp.text)
+        raise typer.Exit(code=1)
+
+    data = resp.json()
+    typer.echo("📨 DM enviado:")
+    typer.echo(f"  id       : {data.get('id')}")
+    typer.echo(f"  from     : {data.get('sender_username')}")
+    typer.echo(f"  to       : {data.get('receiver_username')}")
+    typer.echo(f"  at       : {data.get('created_at')}")
+    typer.echo(f"  content  : {data.get('content')}")
+
+@app.command("read-dm")
+def read_dm(
+    username: str = typer.Argument(..., help="Usuario que lee la conversación"),
+    other_username: str = typer.Argument(..., help="Otro usuario de la conversación"),
+    limit: int = typer.Option(50, "--limit", "-l", help="Número máximo de mensajes"),
+):
+    """
+    Lee la conversación entre `username` y `other_username`
+    usando GET /dm/{username}/{other_username}
+    """
+    params = {"limit": limit, "mark_read": "true"}
+
+    try:
+        resp = requests.get(
+            f"{API_URL}/dm/{username}/{other_username}",
+            params=params,
+        )
+    except Exception as e:
+        typer.echo(f"[ERROR] No se pudo conectar a la API: {e}")
+        raise typer.Exit(code=1)
+
+    if resp.status_code != 200:
+        typer.echo(f"[ERROR] La API respondió {resp.status_code}:")
+        typer.echo(resp.text)
+        raise typer.Exit(code=1)
+
+    messages = resp.json()
+    if not messages:
+        typer.echo(f"No hay mensajes entre {username} y {other_username}.")
+        raise typer.Exit()
+
+    typer.echo(f"💬 Conversación {username} ↔ {other_username}:")
+    for m in messages:
+        sender = m.get("sender_username")
+        receiver = m.get("receiver_username")
+        created_at = m.get("created_at")
+        content = m.get("content")
+        read = m.get("read")
+        read_at = m.get("read_at")
+
+        flag = ""
+        if receiver == username and not read:
+            flag = " [UNREAD]"
+        elif receiver == username and read:
+            flag = " [read]"
+
+        typer.echo("-" * 60)
+        typer.echo(f"{created_at}  {sender} → {receiver}{flag}")
+        typer.echo(f"  {content}")
+        if read_at:
+            typer.echo(f"  read_at: {read_at}")
+    typer.echo("-" * 60)
+    typer.echo(f"Total: {len(messages)} mensajes")
+
+@app.command("list-dm-conversations")
+def list_dm_conversations(
+    username: str = typer.Argument(..., help="Usuario del que se listan conversaciones"),
+):
+    """
+    Lista conversaciones (chats) de `username` usando GET /dm/conversations/{username}
+    """
+    try:
+        resp = requests.get(f"{API_URL}/dm/conversations/{username}")
+    except Exception as e:
+        typer.echo(f"[ERROR] No se pudo conectar a la API: {e}")
+        raise typer.Exit(code=1)
+
+    if resp.status_code != 200:
+        typer.echo(f"[ERROR] La API respondió {resp.status_code}:")
+        typer.echo(resp.text)
+        raise typer.Exit(code=1)
+
+    convs = resp.json()
+    if not convs:
+        typer.echo(f"{username} no tiene conversaciones.")
+        raise typer.Exit()
+
+    typer.echo(f"📁 Conversaciones de {username}:")
+    for c in convs:
+        typer.echo("-" * 60)
+        typer.echo(f"with          : {c.get('with_username')}")
+        typer.echo(f"last_at       : {c.get('last_message_at')}")
+        typer.echo(f"last_message  : {c.get('last_message_content')}")
+        typer.echo(f"unread_count  : {c.get('unread_count')}")
+    typer.echo("-" * 60)
+    typer.echo(f"Total: {len(convs)} conversaciones")
+
 @app.command("get-suggestions")
 def get_suggestions(
     username: str = typer.Argument(..., help="Usuario para el que se quieren sugerencias"),
@@ -187,7 +307,7 @@ def get_suggestions(
     try:
         resp = requests.get(f"{API_URL}/users/{username}/suggestions", params=params)
     except Exception as e:
-        typer.echo(f="[ERROR] No se pudo conectar a la API: {e}")
+        typer.echo(f"[ERROR] No se pudo conectar a la API: {e}")
         raise typer.Exit(code=1)
 
     if resp.status_code != 200:
@@ -203,13 +323,16 @@ def get_suggestions(
     typer.echo(f"✨ Sugerencias para {username}:")
     for s in sugs:
         typer.echo("-" * 60)
-        typer.echo(f"username : {s.get('username')}")
-        typer.echo(f"name     : {s.get('name')}")
-        typer.echo(f"email    : {s.get('email')}")
-        typer.echo(f"bio      : {s.get('bio')}")
-        typer.echo(f"score    : {s.get('score')}")
+        typer.echo(f"username           : {s.get('username')}")
+        typer.echo(f"name               : {s.get('name')}")
+        typer.echo(f"email              : {s.get('email')}")
+        typer.echo(f"bio                : {s.get('bio')}")
+        typer.echo(f"score              : {s.get('score')}")
+        typer.echo(f"mutual_connections : {s.get('mutual_connections')}")
+        typer.echo(f"followers_count    : {s.get('followers_count')}")
+        typer.echo(f"posts_count        : {s.get('posts_count')}")
         if s.get("reason"):
-            typer.echo(f"reason   : {s.get('reason')}")
+            typer.echo(f"reason             : {s.get('reason')}")
     typer.echo("-" * 60)
     typer.echo(f"Total: {len(sugs)} sugerencias")
 
