@@ -16,16 +16,64 @@ from enum import Enum
 
 load_dotenv()
 
-app = FastAPI(title="Red K - API")
+# Crear aplicación principal
+main_app = FastAPI(title="Red K - API")
 
 # Configurar CORS
-app.add_middleware(
+main_app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # En producción, especificar dominios exactos
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Crear app secundaria para manejar rutas sin prefijo
+app = FastAPI()
+
+# Montar la app en main_app en /api Y en /
+# Esto permite que funcione tanto /posts/ como /api/posts/
+main_app.mount("/api", app)
+
+# También agregar las rutas directamente a main_app para que funcione sin /api
+@main_app.get("/")
+def root_redirect():
+    return {"message": "Red K API corriendo dentro de Docker 🐳"}
+
+@main_app.get("/health")
+def health_check_redirect():
+    try:
+        mongo_ok = get_mongo_db() is not None
+        mongo_error = None
+    except Exception as e:
+        mongo_ok = False
+        mongo_error = str(e)
+
+    try:
+        redis_ok = get_redis() is not None
+        redis_error = None
+    except Exception as e:
+        redis_ok = False
+        redis_error = str(e)
+
+    try:
+        neo4j_ok = get_neo4j_driver() is not None
+        neo4j_error = None
+    except Exception as e:
+        neo4j_ok = False
+        neo4j_error = str(e)
+
+    status = "ok" if all([mongo_ok, redis_ok, neo4j_ok]) else "degraded"
+
+    return {
+        "status": status,
+        "mongo": mongo_ok,
+        "mongo_error": mongo_error,
+        "redis": redis_ok,
+        "redis_error": redis_error,
+        "neo4j": neo4j_ok,
+        "neo4j_error": neo4j_error,
+    }
 
 # --------- Config común ---------
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://mongo:27017/red_k")
