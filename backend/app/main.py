@@ -2,6 +2,7 @@ import os
 from typing import Optional, List
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -16,6 +17,15 @@ from enum import Enum
 load_dotenv()
 
 app = FastAPI(title="Red K - API")
+
+# Configurar CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # En producción, especificar dominios exactos
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # --------- Config común ---------
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://mongo:27017/red_k")
