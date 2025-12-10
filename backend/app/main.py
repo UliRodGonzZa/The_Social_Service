@@ -966,3 +966,196 @@ def list_conversations(username: str):
     summaries.sort(key=lambda c: c.last_message_at, reverse=True)
 
     return summaries
+
+
+# ========== ENDPOINTS DE LIKES ==========
+
+class LikeRequest(BaseModel):
+    username: str
+    post_id: str
+
+class LikeResponse(BaseModel):
+    post_id: str
+    likes_count: int
+    user_liked: bool
+
+@app.post("/posts/{post_id}/like", response_model=LikeResponse)
+def like_post(post_id: str, username: str):
+    """
+    Dar like a un post
+    
+    Integración NoSQL:
+    1. Redis: Incrementar contador + agregar a set de usuarios
+    2. Neo4j: Crear relación (User)-[:LIKES]->(Post)
+    3. MongoDB: Actualizar contador (eventual)
+    """
+    redis_client = get_redis_client()
+    
+    # Key para el contador de likes
+    likes_count_key = f"post:{post_id}:likes:count"
+    # Key para el set de usuarios que dieron like
+    likes_users_key = f"post:{post_id}:likes:users"
+    
+    # Verificar si ya dio like
+    if redis_client.sismember(likes_users_key, username):
+        # Ya dio like, contar y retornar
+        count = redis_client.get(likes_count_key)
+        return LikeResponse(
+            post_id=post_id,
+            likes_count=int(count) if count else 0,
+            user_liked=True
+        )
+    
+    # Pipeline atómico
+    pipe = redis_client.pipeline()
+    pipe.incr(likes_count_key)  # Incrementar contador
+    pipe.sadd(likes_users_key, username)  # Agregar usuario al set
+    pipe.zincrby("trending:posts", 1, post_id)  # Agregar al trending
+    results = pipe.execute()
+    
+    new_count = results[0]
+    
+    # Crear relación en Neo4j
+    try:
+        driver = get_neo4j_driver()
+        with driver.session() as session:
+            # Obtener user_id desde MongoDB
+            db = get_mongo_db()
+            users_col = db["users"]
+            user_doc = users_col.find_one({"username": username})
+            if user_doc:
+                user_id = str(user_doc["_id"])
+                
+                session.run(
+                    """
+                    MERGE (u:User {id: $user_id})
+                    MERGE (p:Post {id: $post_id})
+                    MERGE (u)-[:LIKES]->(p)
+                    """,
+                    user_id=user_id,
+                    post_id=post_id
+                )
+        driver.close()
+    except Exception as e:
+        print(f"Warning: Error creating LIKES relationship in Neo4j: {e}")
+    
+    return LikeResponse(
+        post_id=post_id,
+        likes_count=new_count,
+        user_liked=True
+    )
+
+@app.delete("/posts/{post_id}/like")
+def unlike_post(post_id: str, username: str):
+    """
+    Quitar like de un post
+    """
+    redis_client = get_redis_client()
+    
+    likes_count_key = f"post:{post_id}:likes:count"
+    likes_users_key = f"post:{post_id}:likes:users"
+    
+    # Verificar si había dado like
+    if not redis_client.sismember(likes_users_key, username):
+        # No había dado like
+        count = redis_client.get(likes_count_key)
+        return LikeResponse(
+            post_id=post_id,
+            likes_count=int(count) if count else 0,
+            user_liked=False
+        )
+    
+    # Pipeline atómico
+    pipe = redis_client.pipeline()
+    pipe.decr(likes_count_key)
+    pipe.srem(likes_users_key, username)
+    pipe.zincrby("trending:posts", -1, post_id)
+    results = pipe.execute()
+    
+    new_count = max(0, results[0])  # No permitir negativos
+    
+    # Eliminar relación en Neo4j
+    try:
+        driver = get_neo4j_driver()
+        with driver.session() as session:
+            db = get_mongo_db()
+            users_col = db["users"]
+            user_doc = users_col.find_one({"username": username})
+            if user_doc:
+                user_id = str(user_doc["_id"])
+                
+                session.run(
+                    """
+                    MATCH (u:User {id: $user_id})-[r:LIKES]->(p:Post {id: $post_id})
+                    DELETE r
+                    """,
+                    user_id=user_id,
+                    post_id=post_id
+                )
+        driver.close()
+    except Exception as e:
+        print(f"Warning: Error deleting LIKES relationship in Neo4j: {e}")
+    
+    return LikeResponse(
+        post_id=post_id,
+        likes_count=new_count,
+        user_liked=False
+    )
+
+@app.get("/posts/{post_id}/likes", response_model=LikeResponse)
+def get_post_likes(post_id: str, username: str = None):
+    """
+    Obtener información de likes de un post
+    """
+    redis_client = get_redis_client()
+    
+    likes_count_key = f"post:{post_id}:likes:count"
+    likes_users_key = f"post:{post_id}:likes:users"
+    
+    count = redis_client.get(likes_count_key)
+    user_liked = False
+    
+    if username:
+        user_liked = redis_client.sismember(likes_users_key, username)
+    
+    return LikeResponse(
+        post_id=post_id,
+        likes_count=int(count) if count else 0,
+        user_liked=user_liked
+    )
+
+@app.get("/trending/posts")
+def get_trending_posts(limit: int = 10):
+    """
+    Obtener posts trending (más likeados)
+    
+    Redis: ZREVRANGE trending:posts 0 9 WITHSCORES
+    """
+    redis_client = get_redis_client()
+    
+    # Obtener top posts del sorted set
+    trending = redis_client.zrevrange("trending:posts", 0, limit - 1, withscores=True)
+    
+    if not trending:
+        return []
+    
+    # Obtener detalles de los posts desde MongoDB
+    db = get_mongo_db()
+    posts_col = db["posts"]
+    
+    result = []
+    for post_id, score in trending:
+        # Buscar post en MongoDB
+        post_doc = posts_col.find_one({"_id": ObjectId(post_id)})
+        if post_doc:
+            result.append({
+                "id": str(post_doc["_id"]),
+                "author_username": post_doc.get("author_username"),
+                "content": post_doc.get("content"),
+                "tags": post_doc.get("tags", []),
+                "created_at": post_doc.get("created_at"),
+                "likes_count": int(score)
+            })
+    
+    return result
+
