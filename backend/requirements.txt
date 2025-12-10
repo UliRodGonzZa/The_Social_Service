@@ -5,10 +5,8 @@ typer[all]
 requests
 
 pymongo
-redis
+redis[hiredis]>=5.0.0
 neo4j
 
 python-dotenv
 email-validator
-typer[all]
-requests
