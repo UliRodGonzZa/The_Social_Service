@@ -20,7 +20,7 @@ def root():
 
 @app.get("/health")
 async def health():
-    from app.main import get_mongo_db, get_redis, get_neo4j_driver
+    from app.main import get_mongo_db, get_redis_client, get_neo4j_driver
     try:
         mongo_ok = get_mongo_db() is not None
         mongo_error = None
@@ -29,7 +29,7 @@ async def health():
         mongo_error = str(e)
 
     try:
-        redis_ok = get_redis() is not None
+        redis_ok = get_redis_client() is not None
         redis_error = None
     except Exception as e:
         redis_ok = False
