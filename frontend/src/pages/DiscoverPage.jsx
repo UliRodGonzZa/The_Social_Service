@@ -68,6 +68,34 @@ const DiscoverPage = () => {
 };
 
 const UserCard = ({ user }) => {
+  const dispatch = useDispatch();
+  const { currentUser } = useSelector((state) => state.auth);
+  const [following, setFollowing] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+
+  const handleFollow = async () => {
+    if (!currentUser || !currentUser.username) return;
+    
+    setLoading(true);
+    try {
+      const result = await dispatch(
+        followUser({
+          username: currentUser.username,
+          targetUsername: user.username,
+        })
+      );
+      
+      if (result.type === 'users/followUser/fulfilled') {
+        setFollowing(true);
+        console.log('✅ Ahora sigues a', user.username);
+      }
+    } catch (error) {
+      console.error('❌ Error al seguir:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="card p-4 hover:bg-dark-hover transition-colors">
       <div className="flex items-start space-x-3">
@@ -89,8 +117,12 @@ const UserCard = ({ user }) => {
                 </p>
               )}
             </div>
-            <button className="btn-primary">
-              Seguir
+            <button
+              onClick={handleFollow}
+              disabled={loading || following}
+              className={following ? "btn-secondary" : "btn-primary"}
+            >
+              {loading ? 'Siguiendo...' : following ? 'Siguiendo' : 'Seguir'}
             </button>
           </div>
           {user.bio && (
