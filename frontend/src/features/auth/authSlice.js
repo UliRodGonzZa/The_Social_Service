@@ -87,6 +87,13 @@ const authSlice = createSlice({
         }
       }
     },
+    
+    // Auto-login (para modo demo)
+    setDemoUser: (state, action) => {
+      state.currentUser = action.payload;
+      state.isAuthenticated = true;
+      localStorage.setItem('currentUser', JSON.stringify(action.payload));
+    },
   },
   extraReducers: (builder) => {
     // ===== REGISTER =====
