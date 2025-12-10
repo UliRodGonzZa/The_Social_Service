@@ -24,6 +24,12 @@ const CreatePost = () => {
       .map((tag) => tag.trim())
       .filter((tag) => tag.length > 0);
 
+    console.log('📝 Creating post:', { 
+      author_username: currentUser.username, 
+      content: content.trim(),
+      tags: tagsArray 
+    });
+
     const result = await dispatch(
       createPost({
         author_username: currentUser.username,
@@ -33,11 +39,16 @@ const CreatePost = () => {
     );
 
     if (result.type === 'posts/createPost/fulfilled') {
+      console.log('✅ Post created successfully');
       setContent('');
       setTags('');
-      // Limpiar feed para forzar recarga
+      
+      // Recargar el feed automáticamente
       dispatch(clearFeed());
-      // Recargar feed (se hará automáticamente en Feed component)
+      // El useEffect en Feed.jsx detectará el cambio y recargará
+    } else if (result.type === 'posts/createPost/rejected') {
+      console.error('❌ Failed to create post:', result.payload);
+      alert('Error al crear el post: ' + (result.payload || 'Error desconocido'));
     }
   };
 
