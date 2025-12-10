@@ -1,18 +1,19 @@
 /**
  * API Service - Cliente HTTP con axios
- * Centraliza todas las llamadas al backend
+ * FIXED: URL directa sin depender de env vars
  */
 
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+// Usar directamente localhost:8001 (sin /api)
+const API_BASE_URL = 'http://localhost:8001';
 
 console.log('🔌 API Base URL:', API_BASE_URL);
 
-// Crear instancia de axios con configuración base
+// Crear instancia de axios
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -21,7 +22,8 @@ const api = axios.create({
 // Interceptor de request
 api.interceptors.request.use(
   (config) => {
-    console.log('📤 Request:', config.method.toUpperCase(), config.url);
+    const fullUrl = `${config.baseURL}${config.url}`;
+    console.log('📤 Request:', config.method?.toUpperCase(), fullUrl);
     return config;
   },
   (error) => {
@@ -38,7 +40,11 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error.response) {
-      console.error('❌ API Error:', error.response.status, error.response.data);
+      console.error('❌ API Error:', {
+        status: error.response.status,
+        url: error.config?.url,
+        data: error.response.data
+      });
     } else if (error.request) {
       console.error('❌ Network Error:', error.message);
     } else {
@@ -67,7 +73,10 @@ export const usersAPI = {
 
 // ========== POSTS API ==========
 export const postsAPI = {
+  // Crear post: POST /posts/
   createPost: (postData) => api.post('/posts/', postData),
+  
+  // Obtener feed: GET /users/{username}/feed
   getFeed: (username, mode = 'all', limit = 20) => 
     api.get(`/users/${username}/feed`, { params: { mode, limit } }),
 };

@@ -1,13 +1,13 @@
 /**
- * Feed Component - Feed principal de posts
+ * Feed Component - FIXED: Mejor manejo de errores y UX
  */
 
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchFeed, setMode, clearFeed } from './feedSlice';
+import { fetchFeed, setMode, clearFeed, clearError } from './feedSlice';
 import PostCard from '../posts/PostCard';
 import Loader from '../../components/Loader';
-import { FiGrid, FiUsers, FiUser } from 'react-icons/fi';
+import { FiGrid, FiUsers, FiUser, FiAlertCircle } from 'react-icons/fi';
 
 const Feed = () => {
   const dispatch = useDispatch();
@@ -16,7 +16,7 @@ const Feed = () => {
 
   useEffect(() => {
     if (currentUser && currentUser.username) {
-      console.log('📊 Fetching feed for:', currentUser.username, 'mode:', mode);
+      console.log('📊 Loading feed for:', currentUser.username, 'mode:', mode);
       dispatch(fetchFeed({ username: currentUser.username, mode }));
     } else {
       console.warn('⚠️ No current user found');
@@ -26,6 +26,13 @@ const Feed = () => {
   const handleModeChange = (newMode) => {
     dispatch(clearFeed());
     dispatch(setMode(newMode));
+  };
+
+  const handleRetry = () => {
+    dispatch(clearError());
+    if (currentUser && currentUser.username) {
+      dispatch(fetchFeed({ username: currentUser.username, mode }));
+    }
   };
 
   return (
@@ -64,28 +71,53 @@ const Feed = () => {
 
       {/* Content */}
       <div>
+        {/* Loading State */}
         {loading && <Loader />}
         
-        {error && (
+        {/* Error State - SOLO SI HAY ERROR Y NO ESTAMOS CARGANDO */}
+        {!loading && error && (
           <div className="p-4">
-            <div className="bg-danger/10 border border-danger text-danger px-4 py-3 rounded-lg">
-              {error}
+            <div className="card p-6">
+              <div className="flex items-start space-x-3">
+                <FiAlertCircle className="w-6 h-6 text-accent flex-shrink-0 mt-1" />
+                <div className="flex-1">
+                  <h3 className="font-bold mb-2">Error al cargar el feed</h3>
+                  <p className="text-text-secondary text-sm mb-4">{error}</p>
+                  <button
+                    onClick={handleRetry}
+                    className="btn-primary"
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
         
-        {!loading && posts.length === 0 && (
-          <div className="p-8 text-center text-text-secondary">
-            <p>No hay posts para mostrar</p>
-            {mode === 'following' && (
-              <p className="mt-2 text-sm">Comienza siguiendo a otros usuarios</p>
-            )}
+        {/* Empty State - SOLO SI NO HAY ERROR */}
+        {!loading && !error && posts.length === 0 && (
+          <div className="p-8 text-center">
+            <div className="card p-8">
+              <div className="text-6xl mb-4">📭</div>
+              <h2 className="text-xl font-bold mb-2">No hay posts para mostrar</h2>
+              <p className="text-text-secondary">
+                {mode === 'following' && 'Comienza siguiendo a otros usuarios'}
+                {mode === 'self' && 'Crea tu primer post usando el formulario de arriba'}
+                {mode === 'all' && 'Sé el primero en publicar algo'}
+              </p>
+            </div>
           </div>
         )}
         
-        {posts.map((post) => (
-          <PostCard key={post.id} post={post} />
-        ))}
+        {/* Posts List - SOLO SI HAY POSTS */}
+        {!loading && posts.length > 0 && (
+          <div>
+            {posts.map((post) => (
+              <PostCard key={post.id} post={post} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

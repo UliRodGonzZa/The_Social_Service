@@ -1,20 +1,5 @@
 /**
- * Feed Slice - Manejo del feed de posts
- * 
- * INTEGRACIÓN NOSQL:
- * - Neo4j: Query para obtener a quién sigue el usuario
- *   MATCH (u:User {id})-[:FOLLOWS]->(f:User) RETURN f.username
- * 
- * - MongoDB: Query para traer posts de esos usuarios
- *   db.posts.find({author_username: {$in: [usernames]}}).sort({created_at: -1})
- * 
- * - Redis Cluster: Cache del feed con hash tags
- *   Key: {user:alice}:feed:all
- *   TTL: 60 segundos
- *   Shard: Basado en hash de "user:alice" -> Master 1, 2 o 3
- * 
- * PATRÓN:
- * - Graph traversal (Neo4j) -> Document query (MongoDB) -> Cache (Redis)
+ * Feed Slice - FIXED: Mejor manejo de errores
  */
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
@@ -24,37 +9,38 @@ const initialState = {
   posts: [],
   loading: false,
   error: null,
-  mode: 'all', // all, self, following
+  mode: 'all',
   hasMore: true,
 };
 
 /**
  * Fetch feed
- * 
- * Backend: GET /users/{username}/feed?mode=all&limit=20
- * 
- * Flujo en backend:
- * 1. Verificar Redis: GET {user:username}:feed:{mode}
- * 2. Si cache miss:
- *    a. Neo4j: Obtener siguiendo
- *    b. MongoDB: Query posts
- *    c. Redis: SETEX {user:username}:feed:{mode} 60 [posts_json]
- * 3. Retornar posts
- * 
- * REDIS CLUSTER:
- * - Key: {user:alice}:feed:all
- * - Hash de "user:alice" -> slot X -> Master Y
- * - Todos los feeds de alice están en el mismo master
- * - Permite invalidación ef iciente: DELETE {user:alice}:feed:*
+ * Backend: GET /users/{username}/feed?mode={mode}&limit={limit}
  */
 export const fetchFeed = createAsyncThunk(
   'feed/fetchFeed',
   async ({ username, mode = 'all', limit = 20 }, { rejectWithValue }) => {
     try {
+      console.log('🔄 Fetching feed:', { username, mode, limit });
       const response = await postsAPI.getFeed(username, mode, limit);
+      console.log('✅ Feed fetched:', response.data.length, 'posts');
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.detail || 'Error al cargar feed');
+      console.error('❌ Feed fetch error:', error);
+      
+      // Manejo específico de errores
+      if (error.response) {
+        // Error del servidor (404, 500, etc.)
+        const message = error.response.data?.detail || 
+                       `Error ${error.response.status}: ${error.response.statusText}`;
+        return rejectWithValue(message);
+      } else if (error.request) {
+        // Error de red
+        return rejectWithValue('No se pudo conectar al servidor. Verifica tu conexión.');
+      } else {
+        // Otro error
+        return rejectWithValue(error.message || 'Error desconocido');
+      }
     }
   }
 );
@@ -65,10 +51,15 @@ const feedSlice = createSlice({
   reducers: {
     setMode: (state, action) => {
       state.mode = action.payload;
+      state.error = null; // Limpiar error al cambiar modo
     },
     clearFeed: (state) => {
       state.posts = [];
       state.hasMore = true;
+      state.error = null;
+    },
+    clearError: (state) => {
+      state.error = null;
     },
   },
   extraReducers: (builder) => {
@@ -81,13 +72,15 @@ const feedSlice = createSlice({
         state.loading = false;
         state.posts = action.payload;
         state.hasMore = action.payload.length >= 20;
+        state.error = null; // Limpiar error en caso de éxito
       })
       .addCase(fetchFeed.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload;
+        state.error = action.payload || 'Error al cargar el feed';
+        // NO vaciar posts en caso de error (mantener los que había)
       });
   },
 });
 
-export const { setMode, clearFeed } = feedSlice.actions;
+export const { setMode, clearFeed, clearError } = feedSlice.actions;
 export default feedSlice.reducer;
