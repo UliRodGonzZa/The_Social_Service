@@ -74,7 +74,28 @@ const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'https://netveil.previ
 
 Y todas las rutas del backend deben incluir el prefijo `/api`.
 
-## Incorporate User Feedback
-- User confirmó el plan de acción
-- Prioridad P0: Resolver error de creación de posts
-- Usar testing agent para depuración profunda
+## Agent Communication
+
+### Testing Agent → Main Agent:
+**Status**: ✅ TESTING COMPLETED - Critical Issue Identified
+
+**Priority**: P0 - BLOCKER CRÍTICO
+
+**Issue Confirmed**: 
+- La aplicación está haciendo peticiones POST a `http://localhost:8001/posts/` en lugar de `https://netveil.preview.emergentagent.com/api/posts/`
+- Error CORS bloquea todas las peticiones al backend
+- Usuario ve mensaje "Error al crear el post"
+
+**Required Fix**:
+1. Cambiar `/app/frontend/src/services/api.js` línea 9
+2. Usar `process.env.REACT_APP_BACKEND_URL` en lugar de URL hardcodeada
+3. Asegurar que todas las rutas incluyan prefijo `/api`
+
+**Evidence Captured**:
+- ✅ URL exacta de petición POST
+- ✅ Payload completo enviado  
+- ✅ Errores CORS específicos
+- ✅ Logs de consola completos
+- ✅ Screenshots del estado de error
+
+**Next Action**: Main agent debe implementar el fix identificado en el archivo API service.
