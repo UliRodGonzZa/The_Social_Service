@@ -10,7 +10,10 @@ import { setDemoUser } from './features/auth/authSlice';
 
 // Pages
 import FeedPage from './pages/FeedPage';
-import Layout from './components/Layout';
+import TrendingPage from './pages/TrendingPage';
+import DiscoverPage from './pages/DiscoverPage';
+import ProfilePage from './pages/ProfilePage';
+import MessagesPage from './pages/MessagesPage';
 
 function App() {
   const dispatch = useDispatch();
