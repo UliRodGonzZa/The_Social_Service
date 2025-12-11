@@ -919,7 +919,9 @@ def list_conversations(username: str):
     users_col = db["users"]
     dms_col = db["dms"]
 
-    if not users_col.find_one({"username": username}):
+    user_doc = users_col.find_one({"username": username})
+    print(f"🔍 DEBUG conversations: username={username}, found={user_doc is not None}")
+    if not user_doc:
         raise HTTPException(status_code=404, detail="Usuario no existe")
 
     # Traemos todos los mensajes donde participa
