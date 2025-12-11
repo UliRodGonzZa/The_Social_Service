@@ -79,17 +79,16 @@ const UserCard = ({ user }) => {
     
     setLoading(true);
     try {
-      const result = await dispatch(
+      await dispatch(
         followUser({
           username: currentUser.username,
           targetUsername: user.username,
         })
-      );
+      ).unwrap();
       
-      if (result.type === 'users/followUser/fulfilled') {
-        setFollowing(true);
-        console.log('✅ Ahora sigues a', user.username);
-      }
+      // Si llegamos aquí, el follow fue exitoso
+      setFollowing(true);
+      console.log('✅ Ahora sigues a', user.username);
     } catch (error) {
       console.error('❌ Error al seguir:', error);
     } finally {
