@@ -43,11 +43,17 @@ cd red-k
 
 ### 🗄️ Paso 2: Levantar las Bases de Datos
 
-El proyecto incluye un `docker-compose.yml` configurado:
+El proyecto incluye un `docker-compose.local.yml` para desarrollo local (solo bases de datos):
 
 ```bash
 # Desde la raíz del proyecto
-docker-compose up -d
+docker-compose -f docker-compose.local.yml up -d
+```
+
+**Alternativa** - Si prefieres usar el docker-compose.yml completo:
+```bash
+# Necesitas tener el archivo .env en la raíz
+docker-compose up -d mongo redis neo4j
 ```
 
 Esto iniciará:
@@ -57,6 +63,8 @@ Esto iniciará:
 
 **Verificar servicios:**
 ```bash
+docker-compose -f docker-compose.local.yml ps
+# O
 docker-compose ps
 ```
 
