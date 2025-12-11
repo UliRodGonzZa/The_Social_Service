@@ -107,7 +107,7 @@ class DMConversationSummary(BaseModel):
 
 def get_mongo_db():
     client = MongoClient(MONGO_URI)
-    return client.get_database()  # por defecto: red_k
+    return client.get_database("red_k")  # explicitly specify database name
 
 
 def get_redis_client():
