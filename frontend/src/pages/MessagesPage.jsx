@@ -4,65 +4,63 @@
  * INTEGRACIÓN NOSQL:
  * - MongoDB: Almacenar mensajes {sender, receiver, content, created_at}
  * - Neo4j: Relación (User)-[:MESSAGED]->(User) con timestamp
- * - Redis Cluster: Cache de conversaciones
- *   Key: {conv:alice::bob}:messages
- *   TTL: 300 segundos (5 minutos)
+ * - Redis: Cache de conversaciones (TTL 5min)
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import Layout from '../components/Layout';
+import ConversationList from '../features/messages/ConversationList';
+import ChatWindow from '../features/messages/ChatWindow';
+import { fetchConversations, setCurrentConversation } from '../features/messages/messagesSlice';
 
 const MessagesPage = () => {
+  const dispatch = useDispatch();
+  const { currentUser } = useSelector((state) => state.auth);
+  const { conversations, currentConversation } = useSelector((state) => state.messages);
+  const [selectedUser, setSelectedUser] = useState(null);
+
+  useEffect(() => {
+    if (currentUser?.username) {
+      dispatch(fetchConversations(currentUser.username));
+    }
+  }, [dispatch, currentUser]);
+
+  const handleSelectConversation = (username) => {
+    setSelectedUser(username);
+    dispatch(setCurrentConversation(username));
+  };
+
   return (
     <Layout>
-      <div className="min-h-screen">
+      <div className="h-screen flex flex-col">
         {/* Header */}
         <div className="sticky top-0 bg-dark-bg/80 backdrop-blur-md border-b border-dark-border z-10">
           <div className="px-4 py-3">
             <h1 className="text-xl font-bold">💬 Mensajes</h1>
-            <p className="text-text-secondary text-sm">Conversaciones privadas</p>
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex h-screen">
+        <div className="flex flex-1 overflow-hidden">
           {/* Conversations List */}
-          <div className="w-80 border-r border-dark-border">
-            <div className="p-4">
-              <div className="card p-4 text-center">
-                <div className="text-4xl mb-2">💬</div>
-                <p className="text-text-secondary text-sm">No hay conversaciones</p>
-              </div>
+          <div className="w-80 border-r border-dark-border flex flex-col">
+            <div className="px-4 py-3 border-b border-dark-border">
+              <input
+                type="text"
+                placeholder="Buscar conversación..."
+                className="w-full bg-dark-bg text-text-primary px-4 py-2 rounded-full border border-dark-border focus:outline-none focus:border-accent transition-colors text-sm"
+              />
             </div>
+            <ConversationList
+              conversations={conversations}
+              currentConversation={selectedUser}
+              onSelectConversation={handleSelectConversation}
+            />
           </div>
           
           {/* Chat Area */}
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center text-text-secondary">
-              <div className="text-6xl mb-4">📨</div>
-              <h2 className="text-2xl font-bold mb-2">Próximamente</h2>
-              <p className="mb-6">Sistema de mensajes directos en tiempo real</p>
-              
-              <div className="text-left max-w-md mx-auto space-y-3 text-sm">
-                <div className="flex items-start space-x-2">
-                  <span className="text-accent">✓</span>
-                  <span>MongoDB: Almacenar mensajes</span>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <span className="text-accent">✓</span>
-                  <span>Neo4j: Relaciones (User)-[:MESSAGED]->(User)</span>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <span className="text-accent">✓</span>
-                  <span>Redis: Cache de conversaciones (TTL 5min)</span>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <span className="text-accent">✓</span>
-                  <span>WebSockets para mensajes en tiempo real</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <ChatWindow otherUsername={selectedUser} />
         </div>
       </div>
     </Layout>
