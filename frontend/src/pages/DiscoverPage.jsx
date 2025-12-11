@@ -14,8 +14,9 @@
 
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { fetchSuggestions } from '../features/users/usersSlice';
+import { fetchSuggestions, followUser } from '../features/users/usersSlice';
 import Loader from '../components/Loader';
 
 const DiscoverPage = () => {
@@ -100,17 +101,24 @@ const UserCard = ({ user }) => {
     <div className="card p-4 hover:bg-dark-hover transition-colors">
       <div className="flex items-start space-x-3">
         {/* Avatar */}
-        <div className="w-12 h-12 bg-accent-dark rounded-full flex items-center justify-center flex-shrink-0">
-          <span className="text-white font-bold text-lg">
-            {user.username?.charAt(0).toUpperCase()}
-          </span>
-        </div>
+        <Link to={`/profile/${user.username}`}>
+          <div className="w-12 h-12 bg-accent-dark rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
+            <span className="text-white font-bold text-lg">
+              {user.username?.charAt(0).toUpperCase()}
+            </span>
+          </div>
+        </Link>
         
         {/* Info */}
         <div className="flex-1">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-bold">{user.username}</p>
+              <Link 
+                to={`/profile/${user.username}`}
+                className="font-bold hover:underline cursor-pointer"
+              >
+                {user.username}
+              </Link>
               {user.mutual_connections > 0 && (
                 <p className="text-text-secondary text-sm">
                   {user.mutual_connections} conexiones mutuas
@@ -121,6 +129,7 @@ const UserCard = ({ user }) => {
               onClick={handleFollow}
               disabled={loading || following}
               className={following ? "btn-secondary" : "btn-primary"}
+              data-testid={following ? "unfollow-button" : "follow-button"}
             >
               {loading ? 'Siguiendo...' : following ? 'Siguiendo' : 'Seguir'}
             </button>
