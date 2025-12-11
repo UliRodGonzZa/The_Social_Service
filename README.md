@@ -405,18 +405,25 @@ red-k/
 ## 🚀 Comandos Útiles
 
 ```bash
-# Detener todo
-docker-compose down
+# Detener todo (usando docker-compose.local.yml)
+docker-compose -f docker-compose.local.yml down
 # Ctrl+C en terminales de backend y frontend
 
+# Detener todo (usando docker-compose.yml)
+docker-compose down
+
 # Limpiar bases de datos (¡CUIDADO!)
+docker-compose -f docker-compose.local.yml down -v
+# O
 docker-compose down -v
 
 # Reiniciar un servicio
+docker-compose -f docker-compose.local.yml restart mongo
+# O
 docker-compose restart mongo
 
 # Ver logs
-docker-compose logs -f mongo
+docker-compose -f docker-compose.local.yml logs -f mongo
 docker-compose logs -f redis
 docker-compose logs -f neo4j
 
