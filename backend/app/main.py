@@ -393,6 +393,21 @@ def unfollow_user(username: str, target_username: str):
             detail=f"Error al eliminar relación FOLLOWS en Neo4j: {e}",
         )
 
+    # Invalidar caché del feed del usuario (después de unfollow, su feed cambia)
+    try:
+        r = get_redis_client()
+        if r is not None:
+            # Eliminar todas las variantes del feed en caché
+            pattern = f"feed:{username}:*"
+            keys_to_delete = []
+            for key in r.scan_iter(match=pattern):
+                keys_to_delete.append(key)
+            if keys_to_delete:
+                r.delete(*keys_to_delete)
+                print(f"🗑️  Invalidado caché de feed para {username}: {len(keys_to_delete)} keys")
+    except Exception as e:
+        print(f"⚠️  No se pudo invalidar caché (no crítico): {e}")
+
     return {"message": f"{username} dejó de seguir a {target_username}"}
 
 
