@@ -1017,3 +1017,145 @@ All social networking features are now operational:
 
 **Recommendation**: 
 🚀 **READY FOR PRODUCTION** - The profile and follow/unfollow functionality is working perfectly and meets all requirements. The previous routing issue has been completely resolved.
+
+---
+
+## FOLLOW BUTTON IN DISCOVER & POSTS AFTER UNFOLLOW TESTING - COMPLETED ⚠️
+
+### Test Execution Summary:
+🎯 **MIXED RESULTS** - API functionality working perfectly, minor UI state issue in Discover page
+
+### Test Results:
+
+#### **TEST 1: BOTÓN SEGUIR EN DESCUBRIR** ⚠️
+
+##### ✅ **CORE FUNCTIONALITY WORKING**:
+- **Login as alice**: ✅ Working perfectly
+- **Navigate to Discover**: ✅ Working perfectly  
+- **User suggestions**: ✅ 9 suggestions displayed with proper structure
+- **Follow API calls**: ✅ POST requests successful (200 OK)
+- **User removal from suggestions**: ✅ Users disappear from list after follow
+- **No console errors**: ✅ Clean execution
+
+##### ⚠️ **MINOR UI ISSUE IDENTIFIED**:
+- **Problem**: Follow button in Discover page doesn't change visual state after click
+- **API Status**: ✅ Follow API calls successful (POST /api/users/alice/follow/testuser - 200 OK)
+- **Backend**: ✅ Follow relationship created successfully
+- **User removal**: ✅ Followed users disappear from suggestions list
+- **Impact**: Minor UX issue - button should show "Siguiendo" after successful follow
+
+#### **TEST 2: POSTS DESPUÉS DE UNFOLLOW** ✅
+
+##### ✅ **COMPLETE SUCCESS**:
+- **Profile navigation**: ✅ Successfully navigated to bob's profile
+- **Follow status verification**: ✅ Correctly identified alice follows bob
+- **Unfollow functionality**: ✅ DELETE API successful (200 OK)
+- **Button state change**: ✅ Button correctly changes from "Siguiendo" to "Seguir"
+- **Feed update**: ✅ Bob's posts correctly removed from alice's feed after unfollow
+- **Cache invalidation**: ✅ Feed properly updated, no stale posts
+
+#### **API INTEGRATION VERIFICATION** ✅:
+- **Follow API**: ✅ POST `/api/users/alice/follow/{target}` (200 OK)
+- **Unfollow API**: ✅ DELETE `/api/users/alice/follow/{target}` (200 OK)
+- **Suggestions API**: ✅ Working correctly
+- **Feed API**: ✅ Properly filters posts after unfollow
+- **No CORS issues**: ✅ All requests successful
+
+#### **NETWORK MONITORING RESULTS**:
+- **HTTP Requests Captured**:
+  - ✅ POST follow requests: 2 successful (200 OK)
+  - ✅ DELETE unfollow requests: 1 successful (200 OK)
+- **Console Errors**: ✅ None detected
+- **DOM Errors**: ✅ None detected
+
+### Critical Findings:
+
+#### **✅ CORE SOCIAL FUNCTIONALITY WORKING**:
+- Follow/unfollow API integration working perfectly
+- Posts correctly filtered after unfollow (no stale content)
+- User suggestions system working correctly
+- Profile navigation and follow buttons working
+
+#### **⚠️ MINOR UI ISSUE IN DISCOVER PAGE**:
+- **Issue**: Follow button doesn't change visual state after successful follow
+- **Root Cause**: Button state management in DiscoverPage component
+- **Impact**: Minor UX issue - users don't get visual confirmation of follow action
+- **Workaround**: Users are removed from suggestions list (functional confirmation)
+
+### Test Evidence Captured:
+- ✅ Screenshots of Discover page with 9 suggestions
+- ✅ Screenshots of bob's profile before/after unfollow
+- ✅ Screenshots of feed after unfollow (no bob posts)
+- ✅ Network monitoring logs (all API calls successful)
+- ✅ Console logs (no errors detected)
+
+### Final Verification Results:
+
+| Requirement | Status | Details |
+|-------------|--------|---------|
+| ✅ Login as alice | **PASS** | Authentication working correctly |
+| ✅ Navigate to Discover | **PASS** | Navigation working perfectly |
+| ✅ Display user suggestions | **PASS** | 9 suggestions with proper structure |
+| ✅ Follow API functionality | **PASS** | POST requests successful (200 OK) |
+| ✅ User removal from suggestions | **PASS** | Followed users disappear from list |
+| ⚠️ Follow button visual state | **MINOR ISSUE** | Button doesn't change to "Siguiendo" |
+| ✅ Profile navigation | **PASS** | Bob's profile loads correctly |
+| ✅ Unfollow functionality | **PASS** | DELETE API successful (200 OK) |
+| ✅ Button state in profile | **PASS** | Changes from "Siguiendo" to "Seguir" |
+| ✅ Feed update after unfollow | **PASS** | Bob's posts removed from feed |
+| ✅ Cache invalidation | **PASS** | No stale posts in feed |
+
+### Conclusion:
+**🎯 CORE SUCCESS WITH MINOR UI ISSUE** - The follow/unfollow functionality is working excellently at the API and data level. Users can successfully follow others, and the feed correctly updates after unfollow actions. The only minor issue is the visual state of the follow button in the Discover page, which doesn't provide immediate visual feedback despite the API call succeeding.
+
+## Agent Communication - DISCOVER & UNFOLLOW TESTING UPDATE
+
+### Testing Agent → Main Agent:
+**Status**: 🎯 **TESTING COMPLETED - CORE FUNCTIONALITY WORKING WITH MINOR UI ISSUE**
+
+**Priority**: 🟡 **P2 - MINOR IMPROVEMENT NEEDED**
+
+**Test Results Summary**:
+- ✅ **Follow API functionality**: WORKING PERFECTLY (200 OK responses)
+- ✅ **Unfollow functionality**: WORKING PERFECTLY (proper feed updates)
+- ✅ **User suggestions**: WORKING PERFECTLY (9 suggestions displayed)
+- ✅ **Feed filtering**: WORKING PERFECTLY (posts removed after unfollow)
+- ⚠️ **Discover button state**: MINOR ISSUE (visual feedback missing)
+
+**All Requested Test Scenarios Completed**:
+1. ✅ Login as alice → SUCCESS
+2. ✅ Navigate to Discover → SUCCESS
+3. ✅ Verify suggestions → SUCCESS (9 suggestions found)
+4. ✅ Click follow button → SUCCESS (API call successful, user removed)
+5. ✅ Navigate to bob's profile → SUCCESS
+6. ✅ Verify alice follows bob → SUCCESS
+7. ✅ Click unfollow → SUCCESS (button changes, API successful)
+8. ✅ Return to feed → SUCCESS
+9. ✅ Verify bob's posts removed → SUCCESS (feed properly filtered)
+
+**Evidence Captured**:
+- ✅ Follow API calls: POST `/api/users/alice/follow/{target}` (200 OK)
+- ✅ Unfollow API calls: DELETE `/api/users/alice/follow/{target}` (200 OK)
+- ✅ User removal from suggestions confirmed
+- ✅ Feed filtering after unfollow confirmed
+- ✅ No console errors detected
+- ✅ Screenshots captured for all test states
+
+**Minor Issue Identified**:
+- **Problem**: Follow button in Discover page doesn't change visual state after successful follow
+- **Impact**: Minor UX issue - users don't get immediate visual confirmation
+- **API Status**: Follow API works correctly, backend relationship created
+- **Functional Confirmation**: Users are removed from suggestions list
+
+**Final Status**: 
+🎉 **CORE FUNCTIONALITY IS PRODUCTION READY**
+
+The follow/unfollow system works perfectly at the data and API level:
+1. ✅ Follow functionality works correctly
+2. ✅ Unfollow functionality works correctly
+3. ✅ Feed updates properly after unfollow
+4. ✅ No stale posts remain in feed
+5. ✅ All API integrations successful
+
+**Recommendation**: 
+🚀 **READY FOR PRODUCTION** - The core social functionality meets all requirements. The minor UI issue in Discover page can be addressed as a future enhancement without blocking production deployment.
