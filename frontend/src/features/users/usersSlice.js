@@ -65,7 +65,7 @@ export const followUser = createAsyncThunk(
   async ({ username, targetUsername }, { rejectWithValue }) => {
     try {
       const response = await usersAPI.followUser(username, targetUsername);
-      return response.data;
+      return { ...response.data, targetUsername };
     } catch (error) {
       return rejectWithValue(error.response?.data?.detail || 'Error al seguir usuario');
     }
@@ -90,9 +90,11 @@ const usersSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      .addCase(followUser.fulfilled, (state) => {
-        // Invalidar sugerencias (se recargará)
-        state.suggestions = [];
+      .addCase(followUser.fulfilled, (state, action) => {
+        // Remover el usuario seguido de las sugerencias
+        state.suggestions = state.suggestions.filter(
+          user => user.username !== action.payload.targetUsername
+        );
       });
   },
 });
