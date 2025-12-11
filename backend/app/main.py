@@ -925,7 +925,7 @@ def list_conversations(username: str):
     print(f"🔍 DEBUG conversations: username={username}, found={user_doc is not None}, user_doc={user_doc}")
     if not user_doc:
         print(f"❌ DEBUG: Usuario '{username}' no encontrado en la colección")
-        raise HTTPException(status_code=404, detail="Usuario no existe")
+        raise HTTPException(status_code=404, detail=f"Usuario '{username}' no encontrado en MongoDB [DEBUG v2]")
 
     # Traemos todos los mensajes donde participa
     cursor = dms_col.find(
