@@ -85,10 +85,8 @@ const ObservabilityPage = () => {
                     : 'border-transparent text-text-secondary hover:text-text-primary'
                 }`}
                 data-testid="tab-messaging-metrics"
-                disabled
               >
                 💬 Messaging Metrics
-                <span className="ml-2 text-xs text-text-secondary">(Sprint 2)</span>
               </button>
               
               <button
