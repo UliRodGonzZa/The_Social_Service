@@ -24,7 +24,8 @@ const ConversationList = ({ conversations, currentConversation, onSelectConversa
   return (
     <div className="overflow-y-auto">
       {conversations.map((conversation) => {
-        const isActive = currentConversation === conversation.username;
+        const username = conversation.with_username || conversation.username;
+        const isActive = currentConversation === username;
         const timeAgo = conversation.last_message_at 
           ? formatDistanceToNow(new Date(conversation.last_message_at), { 
               addSuffix: true, 
@@ -34,8 +35,8 @@ const ConversationList = ({ conversations, currentConversation, onSelectConversa
 
         return (
           <div
-            key={conversation.username}
-            onClick={() => onSelectConversation(conversation.username)}
+            key={username}
+            onClick={() => onSelectConversation(username)}
             className={`px-4 py-3 border-b border-dark-border cursor-pointer transition-colors ${
               isActive 
                 ? 'bg-dark-hover border-l-4 border-l-accent' 
@@ -46,14 +47,14 @@ const ConversationList = ({ conversations, currentConversation, onSelectConversa
               {/* Avatar */}
               <div className="w-12 h-12 bg-accent-dark rounded-full flex items-center justify-center flex-shrink-0">
                 <span className="text-white font-bold text-lg">
-                  {conversation.username?.charAt(0).toUpperCase()}
+                  {username?.charAt(0).toUpperCase()}
                 </span>
               </div>
 
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
-                  <p className="font-bold truncate">{conversation.username}</p>
+                  <p className="font-bold truncate">{username}</p>
                   {timeAgo && (
                     <span className="text-xs text-text-secondary flex-shrink-0">
                       {timeAgo}
