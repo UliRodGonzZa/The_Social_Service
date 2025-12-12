@@ -589,13 +589,17 @@ def get_user_feed(
 
     # Intentar leer de cache
     if r is not None:
-        cached = r.get(cache_key)
-        if cached:
-            try:
-                data = json.loads(cached)
-                return data
-            except Exception:
-                pass  # si falla parseo, seguimos normal
+        try:
+            cached = r.get(cache_key)
+            if cached:
+                try:
+                    data = json.loads(cached)
+                    return data
+                except Exception:
+                    pass  # si falla parseo, seguimos normal
+        except Exception:
+            # Redis no está disponible, continuar sin cache
+            r = None
 
     # Construir lista de autores según el modo
     authors: List[str] = []
