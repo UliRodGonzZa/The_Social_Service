@@ -145,12 +145,12 @@ const UserCard = ({ user }) => {
               )}
             </div>
             <button
-              onClick={handleFollow}
-              disabled={loading || following}
+              onClick={following ? handleUnfollow : handleFollow}
+              disabled={loading}
               className={following ? "btn-secondary" : "btn-primary"}
               data-testid={following ? "unfollow-button" : "follow-button"}
             >
-              {loading ? 'Siguiendo...' : following ? 'Siguiendo' : 'Seguir'}
+              {loading ? (following ? 'Dejando de seguir...' : 'Siguiendo...') : following ? 'Siguiendo' : 'Seguir'}
             </button>
           </div>
           {user.bio && (
