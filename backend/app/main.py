@@ -915,8 +915,10 @@ def list_conversations(username: str):
     - timestamp del último mensaje
     - número de mensajes no leídos
     """
-    import sys
-    print(f"🔍 DEBUG START: list_conversations called for username={username}", file=sys.stderr, flush=True)
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    logger.info(f"🔍 list_conversations called for username={username}")
     db = get_mongo_db()
     print(f"🔍 DEBUG: Database obtained: {db.name}", file=sys.stderr, flush=True)
     users_col = db["users"]
