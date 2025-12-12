@@ -530,3 +530,305 @@ async def get_observability_mode():
         "description": "mock: datos simulados, production: cluster real",
         "timestamp": datetime.utcnow().isoformat(),
     }
+
+
+# ============================================================================
+# Sprint 2: Messaging Metrics Endpoints
+# ============================================================================
+
+def get_messaging_rate_metrics_production():
+    """
+    Obtiene métricas de tasa de mensajes desde Redis.
+    
+    Keys usadas:
+    - msg:rate:{minute} - Contador de mensajes por minuto (INCR + EXPIRE 60)
+    - msg:total:today - Total de mensajes del día (INCR + EXPIRE 86400)
+    - active:conversations - Set de conversaciones activas (SADD + EXPIRE)
+    """
+    try:
+        rc = get_redis_cluster_client()
+        if not rc:
+            return None
+        
+        from datetime import datetime
+        now = datetime.utcnow()
+        current_minute = now.strftime("%Y%m%d%H%M")
+        
+        # Obtener mensajes del minuto actual
+        msg_current_min = rc.get(f"msg:rate:{current_minute}")
+        messages_per_minute = int(msg_current_min) if msg_current_min else 0
+        
+        # Calcular mensajes por segundo (aproximación)
+        messages_per_second = round(messages_per_minute / 60.0, 2)
+        
+        # Total de mensajes hoy
+        today = now.strftime("%Y%m%d")
+        total_today = rc.get(f"msg:total:{today}")
+        total_messages_today = int(total_today) if total_today else 0
+        
+        # Conversaciones activas
+        active_convs = rc.scard("active:conversations")
+        
+        return MessagingRateMetrics(
+            messages_per_minute=messages_per_minute,
+            messages_per_second=messages_per_second,
+            total_messages_today=total_messages_today,
+            peak_minute=None,  # TODO: implementar tracking de pico
+            active_conversations=active_convs if active_convs else 0,
+        )
+    except Exception as e:
+        print(f"⚠️ Error obteniendo rate metrics: {e}")
+        return None
+
+
+def get_presence_metrics_production():
+    """
+    Obtiene métricas de presencia y typing desde Redis.
+    
+    Keys usadas:
+    - presence:{userId} - Key con TTL 30s, valor "online"
+    - typing:{chatId}:{userId} - Key con TTL 3s, valor timestamp
+    
+    Para escanear todas las keys de presencia, usamos SCAN (no KEYS).
+    """
+    try:
+        rc = get_redis_cluster_client()
+        if not rc:
+            return None
+        
+        users_online = []
+        typing_in_chats = {}
+        
+        # Escanear keys de presencia
+        # Nota: En cluster, SCAN debe ejecutarse en cada master
+        for node in REDIS_CLUSTER_NODES:
+            try:
+                node_client = redis.Redis(
+                    host=node["host"],
+                    port=node["port"],
+                    decode_responses=True,
+                    socket_timeout=2
+                )
+                
+                # Escanear presence:*
+                cursor = 0
+                while True:
+                    cursor, keys = node_client.scan(cursor, match="presence:*", count=100)
+                    for key in keys:
+                        user_id = key.split(":")[1]
+                        if user_id not in users_online:
+                            users_online.append(user_id)
+                    if cursor == 0:
+                        break
+                
+                # Escanear typing:*
+                cursor = 0
+                while True:
+                    cursor, keys = node_client.scan(cursor, match="typing:*", count=100)
+                    for key in keys:
+                        # key formato: typing:{chatId}:{userId}
+                        parts = key.split(":")
+                        if len(parts) >= 3:
+                            chat_id = parts[1]
+                            user_id = parts[2]
+                            if chat_id not in typing_in_chats:
+                                typing_in_chats[chat_id] = []
+                            if user_id not in typing_in_chats[chat_id]:
+                                typing_in_chats[chat_id].append(user_id)
+                    if cursor == 0:
+                        break
+                        
+            except Exception as e:
+                print(f"⚠️ Error escaneando nodo {node}: {e}")
+                continue
+        
+        return PresenceMetrics(
+            total_online=len(users_online),
+            total_typing=sum(len(users) for users in typing_in_chats.values()),
+            users_online=users_online[:50],  # Limitar a 50 para no sobrecargar
+            typing_in_chats=typing_in_chats,
+        )
+    except Exception as e:
+        print(f"⚠️ Error obteniendo presence metrics: {e}")
+        return None
+
+
+def get_unread_metrics_production():
+    """
+    Obtiene métricas de mensajes no leídos desde Redis.
+    
+    Keys usadas:
+    - unread:{userId} - HASH con {chatId: count}
+    
+    Comandos:
+    - HGETALL unread:{userId} - Obtener todos los no leídos de un usuario
+    - HLEN unread:{userId} - Contar conversaciones con no leídos
+    """
+    try:
+        rc = get_redis_cluster_client()
+        if not rc:
+            return None
+        
+        total_unread = 0
+        users_with_unread = 0
+        conversation_unreads = {}
+        
+        # Escanear keys unread:*
+        for node in REDIS_CLUSTER_NODES:
+            try:
+                node_client = redis.Redis(
+                    host=node["host"],
+                    port=node["port"],
+                    decode_responses=True,
+                    socket_timeout=2
+                )
+                
+                cursor = 0
+                while True:
+                    cursor, keys = node_client.scan(cursor, match="unread:*", count=100)
+                    for key in keys:
+                        user_id = key.split(":")[1]
+                        
+                        # Obtener hash de no leídos
+                        unread_hash = node_client.hgetall(key)
+                        if unread_hash:
+                            users_with_unread += 1
+                            for chat_id, count in unread_hash.items():
+                                count_int = int(count)
+                                total_unread += count_int
+                                
+                                # Acumular por conversación
+                                if chat_id not in conversation_unreads:
+                                    conversation_unreads[chat_id] = 0
+                                conversation_unreads[chat_id] += count_int
+                    
+                    if cursor == 0:
+                        break
+                        
+            except Exception as e:
+                print(f"⚠️ Error escaneando unread en nodo {node}: {e}")
+                continue
+        
+        # Top conversaciones con más no leídos
+        top_conversations = [
+            {"chat_id": chat_id, "unread_count": count}
+            for chat_id, count in sorted(
+                conversation_unreads.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )[:10]
+        ]
+        
+        avg_unread = (total_unread / users_with_unread) if users_with_unread > 0 else 0.0
+        
+        return UnreadMetrics(
+            total_unread_messages=total_unread,
+            users_with_unread=users_with_unread,
+            top_conversations=top_conversations,
+            average_unread_per_user=round(avg_unread, 2),
+        )
+    except Exception as e:
+        print(f"⚠️ Error obteniendo unread metrics: {e}")
+        return None
+
+
+def get_mock_messaging_metrics():
+    """Retorna métricas mock de mensajería"""
+    return MessagingMetricsResponse(
+        mode="mock",
+        timestamp=datetime.utcnow().isoformat(),
+        rate=MessagingRateMetrics(
+            messages_per_minute=45,
+            messages_per_second=0.75,
+            total_messages_today=3250,
+            peak_minute=120,
+            active_conversations=28,
+        ),
+        presence=PresenceMetrics(
+            total_online=15,
+            total_typing=3,
+            users_online=["rodrigo", "kam", "alex", "maria", "juan"],
+            typing_in_chats={
+                "chat:abc123": ["rodrigo"],
+                "chat:xyz789": ["kam", "alex"],
+            },
+        ),
+        unread=UnreadMetrics(
+            total_unread_messages=47,
+            users_with_unread=12,
+            top_conversations=[
+                {"chat_id": "chat:abc123", "unread_count": 15},
+                {"chat_id": "chat:xyz789", "unread_count": 10},
+                {"chat_id": "chat:def456", "unread_count": 8},
+            ],
+            average_unread_per_user=3.92,
+        ),
+    )
+
+
+@router.get("/messaging/metrics", response_model=MessagingMetricsResponse)
+async def get_messaging_metrics():
+    """
+    Obtiene métricas de mensajería desde Redis Cluster.
+    
+    Sprint 2 - Métricas:
+    1. Rate: Mensajes por minuto/segundo
+    2. Presence: Usuarios online y typing
+    3. Unread: Mensajes no leídos por conversación
+    
+    Keys de Redis:
+    - msg:rate:{minute} - INCR + EXPIRE 60
+    - presence:{userId} - SET con TTL 30s
+    - typing:{chatId}:{userId} - SET con TTL 3s
+    - unread:{userId} - HASH {chatId: count}
+    """
+    
+    # Modo mock
+    if OBSERVABILITY_MODE == "mock":
+        return get_mock_messaging_metrics()
+    
+    # Modo production
+    try:
+        rate = get_messaging_rate_metrics_production()
+        presence = get_presence_metrics_production()
+        unread = get_unread_metrics_production()
+        
+        # Si alguno falla, usar valores por defecto
+        if not rate:
+            rate = MessagingRateMetrics(
+                messages_per_minute=0,
+                messages_per_second=0.0,
+                total_messages_today=0,
+                active_conversations=0,
+            )
+        
+        if not presence:
+            presence = PresenceMetrics(
+                total_online=0,
+                total_typing=0,
+                users_online=[],
+                typing_in_chats={},
+            )
+        
+        if not unread:
+            unread = UnreadMetrics(
+                total_unread_messages=0,
+                users_with_unread=0,
+                top_conversations=[],
+                average_unread_per_user=0.0,
+            )
+        
+        return MessagingMetricsResponse(
+            mode="production",
+            timestamp=datetime.utcnow().isoformat(),
+            rate=rate,
+            presence=presence,
+            unread=unread,
+        )
+        
+    except Exception as e:
+        print(f"❌ Error en get_messaging_metrics: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error obteniendo messaging metrics: {str(e)}"
+        )
