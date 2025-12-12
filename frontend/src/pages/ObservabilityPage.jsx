@@ -12,6 +12,7 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import ClusterHealthTab from '../features/observability/ClusterHealthTab';
+import MessagingMetricsTab from '../features/observability/MessagingMetricsTab';
 
 const ObservabilityPage = () => {
   const [activeTab, setActiveTab] = useState('health'); // 'health', 'messaging', 'distribution'
