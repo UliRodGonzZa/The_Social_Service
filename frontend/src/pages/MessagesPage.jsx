@@ -18,7 +18,7 @@ import { usersAPI } from '../services/api';
 const MessagesPage = () => {
   const dispatch = useDispatch();
   const { currentUser } = useSelector((state) => state.auth);
-  const { conversations, currentConversation } = useSelector((state) => state.messages);
+  const { conversations } = useSelector((state) => state.messages);
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNewChatModal, setShowNewChatModal] = useState(false);
