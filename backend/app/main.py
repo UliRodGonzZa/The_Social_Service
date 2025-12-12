@@ -1141,39 +1141,44 @@ def get_trending_posts(limit: int = 10):
     
     Redis: ZREVRANGE trending:posts 0 9 WITHSCORES
     """
-    redis_client = get_redis_client()
-    
-    # Obtener top posts del sorted set
-    trending = redis_client.zrevrange("trending:posts", 0, limit - 1, withscores=True)
-    
-    if not trending:
-        return []
-    
-    # Obtener detalles de los posts desde MongoDB
-    db = get_mongo_db()
-    posts_col = db["posts"]
-    
-    result = []
-    for post_id, score in trending:
-        # Convertir bytes a string si es necesario
-        if isinstance(post_id, bytes):
-            post_id = post_id.decode('utf-8')
+    try:
+        redis_client = get_redis_client()
         
-        # Buscar post en MongoDB
-        try:
-            post_doc = posts_col.find_one({"_id": ObjectId(post_id)})
-            if post_doc:
-                result.append({
-                    "id": str(post_doc["_id"]),
-                    "author_username": post_doc.get("author_username"),
-                    "content": post_doc.get("content"),
-                    "tags": post_doc.get("tags", []),
-                    "created_at": post_doc.get("created_at"),
-                    "likes_count": int(score)
-                })
-        except Exception as e:
-            print(f"Error getting post {post_id}: {e}")
-            continue
-    
-    return result
+        # Obtener top posts del sorted set
+        trending = redis_client.zrevrange("trending:posts", 0, limit - 1, withscores=True)
+        
+        if not trending:
+            return []
+        
+        # Obtener detalles de los posts desde MongoDB
+        db = get_mongo_db()
+        posts_col = db["posts"]
+        
+        result = []
+        for post_id, score in trending:
+            # Convertir bytes a string si es necesario
+            if isinstance(post_id, bytes):
+                post_id = post_id.decode('utf-8')
+            
+            # Buscar post en MongoDB
+            try:
+                post_doc = posts_col.find_one({"_id": ObjectId(post_id)})
+                if post_doc:
+                    result.append({
+                        "id": str(post_doc["_id"]),
+                        "author_username": post_doc.get("author_username"),
+                        "content": post_doc.get("content"),
+                        "tags": post_doc.get("tags", []),
+                        "created_at": post_doc.get("created_at"),
+                        "likes_count": int(score)
+                    })
+            except Exception as e:
+                print(f"Error getting post {post_id}: {e}")
+                continue
+        
+        return result
+    except Exception as e:
+        print(f"⚠️ Redis not available for trending: {e}")
+        # Fallback: retornar lista vacía cuando Redis no está disponible
+        return []
 
