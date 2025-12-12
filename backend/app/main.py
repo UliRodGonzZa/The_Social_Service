@@ -745,11 +745,9 @@ def get_suggestions(username: str, limit: int = 10):
                 )
         driver.close()
     except Exception as e:
-        # si Neo4j falla, error 
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error al consultar sugerencias en Neo4j: {e}",
-        )
+        # si Neo4j falla, usar fallback a MongoDB
+        print(f"⚠️ Neo4j no disponible para suggestions: {e}")
+        pass
 
     if not suggestions:
         docs = (
