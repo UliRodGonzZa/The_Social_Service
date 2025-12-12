@@ -15,8 +15,14 @@ from datetime import datetime
 import json
 from enum import Enum
 
-# Importar router de observability
-from app.observability import router as observability_router
+# Importar router de observability (opcional, puede no existir en local)
+try:
+    from app.observability import router as observability_router
+    OBSERVABILITY_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ Módulo de observability no disponible: {e}")
+    observability_router = None
+    OBSERVABILITY_AVAILABLE = False
 
 load_dotenv()
 
