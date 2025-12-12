@@ -16,7 +16,7 @@ import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { fetchSuggestions, followUser } from '../features/users/usersSlice';
+import { fetchSuggestions, followUser, unfollowUser } from '../features/users/usersSlice';
 import Loader from '../components/Loader';
 
 const DiscoverPage = () => {
