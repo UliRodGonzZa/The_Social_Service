@@ -1167,26 +1167,29 @@ def get_trending_posts(limit: int = 10):
     """
     Obtener posts trending (más likeados)
     
-    Redis: ZREVRANGE trending:posts 0 9 WITHSCORES
+    Usa MongoDB como fuente principal, agregando likes por post
     """
     try:
-        redis_client = get_redis_client()
-        
-        # Obtener top posts del sorted set
-        trending = redis_client.zrevrange("trending:posts", 0, limit - 1, withscores=True)
-        
-        if not trending:
-            return []
-        
-        # Obtener detalles de los posts desde MongoDB
         db = get_mongo_db()
         posts_col = db["posts"]
+        likes_col = db["likes"]
+        
+        # Agregación para contar likes por post
+        pipeline = [
+            {"$group": {"_id": "$post_id", "likes_count": {"$sum": 1}}},
+            {"$sort": {"likes_count": -1}},
+            {"$limit": limit}
+        ]
+        
+        trending_data = list(likes_col.aggregate(pipeline))
+        
+        if not trending_data:
+            return []
         
         result = []
-        for post_id, score in trending:
-            # Convertir bytes a string si es necesario
-            if isinstance(post_id, bytes):
-                post_id = post_id.decode('utf-8')
+        for item in trending_data:
+            post_id = item["_id"]
+            likes_count = item["likes_count"]
             
             # Buscar post en MongoDB
             try:
@@ -1198,7 +1201,7 @@ def get_trending_posts(limit: int = 10):
                         "content": post_doc.get("content"),
                         "tags": post_doc.get("tags", []),
                         "created_at": post_doc.get("created_at"),
-                        "likes_count": int(score)
+                        "likes_count": likes_count
                     })
             except Exception as e:
                 print(f"Error getting post {post_id}: {e}")
@@ -1206,7 +1209,6 @@ def get_trending_posts(limit: int = 10):
         
         return result
     except Exception as e:
-        print(f"⚠️ Redis not available for trending: {e}")
-        # Fallback: retornar lista vacía cuando Redis no está disponible
+        print(f"⚠️ Error getting trending posts: {e}")
         return []
 
