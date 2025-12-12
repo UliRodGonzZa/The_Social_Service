@@ -74,6 +74,12 @@ const Navbar = () => {
           testId="nav-messages"
         />
         <NavItem
+          icon={<FiActivity />}
+          text="Observability"
+          to="/observability"
+          testId="nav-observability"
+        />
+        <NavItem
           icon={<FiUser />}
           text="Perfil"
           to={`/profile/${currentUser?.username}`}
