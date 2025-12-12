@@ -383,7 +383,8 @@ def unfollow_user(username: str, target_username: str):
     user_id = str(user_doc["_id"])
     target_id = str(target_doc["_id"])
 
-    # Eliminar relación en Neo4j
+    # Eliminar relación en Neo4j (o MongoDB como fallback)
+    deleted = False
     try:
         driver = get_neo4j_driver()
         with driver.session() as session:
@@ -404,15 +405,22 @@ def unfollow_user(username: str, target_username: str):
                     status_code=404, 
                     detail=f"{username} no sigue a {target_username}"
                 )
+            deleted = True
         
         driver.close()
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error al eliminar relación FOLLOWS en Neo4j: {e}",
-        )
+        print(f"⚠️ Neo4j no disponible para unfollow, usando MongoDB: {e}")
+        # Fallback: eliminar de MongoDB
+        follows_col = db["follows"]
+        result = follows_col.delete_one({"follower": username, "following": target_username})
+        if result.deleted_count == 0:
+            raise HTTPException(
+                status_code=404,
+                detail=f"{username} no sigue a {target_username}"
+            )
+        deleted = True
 
     # Invalidar caché del feed del usuario (después de unfollow, su feed cambia)
     try:
