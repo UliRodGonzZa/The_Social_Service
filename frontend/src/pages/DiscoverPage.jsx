@@ -86,11 +86,31 @@ const UserCard = ({ user }) => {
         })
       ).unwrap();
       
-      // Si llegamos aquí, el follow fue exitoso
       setFollowing(true);
       console.log('✅ Ahora sigues a', user.username);
     } catch (error) {
       console.error('❌ Error al seguir:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUnfollow = async () => {
+    if (!currentUser || !currentUser.username) return;
+    
+    setLoading(true);
+    try {
+      await dispatch(
+        unfollowUser({
+          username: currentUser.username,
+          targetUsername: user.username,
+        })
+      ).unwrap();
+      
+      setFollowing(false);
+      console.log('✅ Dejaste de seguir a', user.username);
+    } catch (error) {
+      console.error('❌ Error al dejar de seguir:', error);
     } finally {
       setLoading(false);
     }
