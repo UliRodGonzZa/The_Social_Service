@@ -15,6 +15,9 @@ from datetime import datetime
 import json
 from enum import Enum
 
+# Importar router de observability
+from app.observability import router as observability_router
+
 load_dotenv()
 
 app = FastAPI(title="Red K - API")
