@@ -311,7 +311,8 @@ def follow_user(username: str, target_username: str):
     user_id = str(user_doc["_id"])
     target_id = str(target_doc["_id"])
 
-    # Crear relación en Neo4j
+    # Crear relación en Neo4j (o MongoDB como fallback)
+    neo4j_success = False
     try:
         driver = get_neo4j_driver()
         with driver.session() as session:
@@ -329,10 +330,15 @@ def follow_user(username: str, target_username: str):
                 target_username=target_username,
             )
         driver.close()
+        neo4j_success = True
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error al crear relación FOLLOWS en Neo4j: {e}",
+        print(f"⚠️ Neo4j no disponible para follow, usando MongoDB: {e}")
+        # Fallback: guardar en MongoDB
+        follows_col = db["follows"]
+        follows_col.update_one(
+            {"follower": username, "following": target_username},
+            {"$set": {"follower": username, "following": target_username}},
+            upsert=True
         )
 
     # Invalidar caché del feed del usuario (después de follow, su feed cambia)
