@@ -38,7 +38,11 @@ app.add_middleware(
 )
 
 # Registrar router de observability (ya tiene su propio prefix)
-app.include_router(observability_router)
+if OBSERVABILITY_AVAILABLE and observability_router is not None:
+    app.include_router(observability_router)
+    print("✅ Router de observability registrado")
+else:
+    print("⚠️ Router de observability no disponible - continuando sin él")
 
 # --------- Config común ---------
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017/red_k")
