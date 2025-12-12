@@ -8,7 +8,7 @@ import axios from "axios";
 // Usar variable de entorno con fallback
 const API_BASE_URL =
   process.env.REACT_APP_BACKEND_URL ||
-  "https://netveil.preview.emergentagent.com";
+  "https://socialfastapi.preview.emergentagent.com";
 
 console.log(" API Base URL:", API_BASE_URL);
 console.log(" Environment:", process.env.REACT_APP_BACKEND_URL);
