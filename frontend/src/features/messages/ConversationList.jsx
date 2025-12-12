@@ -62,9 +62,9 @@ const ConversationList = ({ conversations, currentConversation, onSelectConversa
                   )}
                 </div>
                 
-                {conversation.last_message && (
+                {conversation.last_message_content && (
                   <p className="text-sm text-text-secondary truncate">
-                    {conversation.last_message}
+                    {conversation.last_message_content}
                   </p>
                 )}
                 
