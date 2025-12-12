@@ -1146,20 +1146,19 @@ def get_post_likes(post_id: str, username: str = None):
     """
     Obtener información de likes de un post
     """
-    redis_client = get_redis_client()
+    db = get_mongo_db()
+    likes_col = db["likes"]
     
-    likes_count_key = f"post:{post_id}:likes:count"
-    likes_users_key = f"post:{post_id}:likes:users"
-    
-    count = redis_client.get(likes_count_key)
+    # Contar likes desde MongoDB
+    count = likes_col.count_documents({"post_id": post_id})
     user_liked = False
     
     if username:
-        user_liked = redis_client.sismember(likes_users_key, username)
+        user_liked = likes_col.find_one({"post_id": post_id, "username": username}) is not None
     
     return LikeResponse(
         post_id=post_id,
-        likes_count=int(count) if count else 0,
+        likes_count=count,
         user_liked=user_liked
     )
 
