@@ -31,8 +31,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Registrar router de observability
-app.include_router(observability_router, prefix="/observability", tags=["observability"])
+# Registrar router de observability (ya tiene su propio prefix)
+app.include_router(observability_router)
 
 # --------- Config común ---------
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017/red_k")
