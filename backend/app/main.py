@@ -951,20 +951,13 @@ def list_conversations(username: str):
     - timestamp del último mensaje
     - número de mensajes no leídos
     """
-    import logging
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
-    logger.info(f"🔍 list_conversations called for username={username}")
     db = get_mongo_db()
-    print(f"🔍 DEBUG: Database obtained: {db.name}", file=sys.stderr, flush=True)
     users_col = db["users"]
     dms_col = db["dms"]
 
     user_doc = users_col.find_one({"username": username})
-    print(f"🔍 DEBUG conversations: username={username}, found={user_doc is not None}, user_doc={user_doc}", file=sys.stderr, flush=True)
     if not user_doc:
-        print(f"❌ DEBUG: Usuario '{username}' no encontrado en la colección", file=sys.stderr, flush=True)
-        raise HTTPException(status_code=404, detail=f"Usuario '{username}' no encontrado en MongoDB [DEBUG v2]")
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     # Traemos todos los mensajes donde participa
     cursor = dms_col.find(
