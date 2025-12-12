@@ -109,12 +109,7 @@ const ObservabilityPage = () => {
         {/* Content */}
         <div className="px-6 py-6">
           {activeTab === 'health' && <ClusterHealthTab mode={mode} />}
-          {activeTab === 'messaging' && (
-            <div className="text-center py-20 text-text-secondary">
-              <p className="text-lg">💬 Messaging Metrics</p>
-              <p className="text-sm mt-2">Coming in Sprint 2</p>
-            </div>
-          )}
+          {activeTab === 'messaging' && <MessagingMetricsTab mode={mode} />}
           {activeTab === 'distribution' && (
             <div className="text-center py-20 text-text-secondary">
               <p className="text-lg">🗺️ Data Distribution</p>
