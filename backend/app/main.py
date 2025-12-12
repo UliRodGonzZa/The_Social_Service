@@ -1019,45 +1019,47 @@ def like_post(post_id: str, username: str):
     Integración NoSQL:
     1. Redis: Incrementar contador + agregar a set de usuarios
     2. Neo4j: Crear relación (User)-[:LIKES]->(Post)
-    3. MongoDB: Actualizar contador (eventual)
+    3. MongoDB: Actualizar contador (fallback)
     """
-    redis_client = get_redis_client()
+    db = get_mongo_db()
+    likes_col = db["likes"]
     
-    # Key para el contador de likes
-    likes_count_key = f"post:{post_id}:likes:count"
-    # Key para el set de usuarios que dieron like
-    likes_users_key = f"post:{post_id}:likes:users"
-    
-    # Verificar si ya dio like
-    if redis_client.sismember(likes_users_key, username):
+    # Verificar si ya dio like (primero en MongoDB)
+    existing_like = likes_col.find_one({"post_id": post_id, "username": username})
+    if existing_like:
         # Ya dio like, contar y retornar
-        count = redis_client.get(likes_count_key)
+        count = likes_col.count_documents({"post_id": post_id})
         return LikeResponse(
             post_id=post_id,
-            likes_count=int(count) if count else 0,
+            likes_count=count,
             user_liked=True
         )
     
-    # Pipeline atómico
-    pipe = redis_client.pipeline()
-    pipe.incr(likes_count_key)  # Incrementar contador
-    pipe.sadd(likes_users_key, username)  # Agregar usuario al set
-    pipe.zincrby("trending:posts", 1, post_id)  # Agregar al trending
-    results = pipe.execute()
+    # Guardar like en MongoDB
+    likes_col.insert_one({"post_id": post_id, "username": username})
+    new_count = likes_col.count_documents({"post_id": post_id})
     
-    new_count = results[0]
+    # Intentar con Redis (opcional)
+    try:
+        redis_client = get_redis_client()
+        likes_count_key = f"post:{post_id}:likes:count"
+        likes_users_key = f"post:{post_id}:likes:users"
+        pipe = redis_client.pipeline()
+        pipe.set(likes_count_key, new_count)
+        pipe.sadd(likes_users_key, username)
+        pipe.zincrby("trending:posts", 1, post_id)
+        pipe.execute()
+    except Exception as e:
+        print(f"⚠️ Redis no disponible para likes: {e}")
     
-    # Crear relación en Neo4j
+    # Crear relación en Neo4j (opcional)
     try:
         driver = get_neo4j_driver()
         with driver.session() as session:
-            # Obtener user_id desde MongoDB
-            db = get_mongo_db()
             users_col = db["users"]
             user_doc = users_col.find_one({"username": username})
             if user_doc:
                 user_id = str(user_doc["_id"])
-                
                 session.run(
                     """
                     MERGE (u:User {id: $user_id})
@@ -1069,7 +1071,7 @@ def like_post(post_id: str, username: str):
                 )
         driver.close()
     except Exception as e:
-        print(f"Warning: Error creating LIKES relationship in Neo4j: {e}")
+        print(f"⚠️ Neo4j no disponible para likes: {e}")
     
     return LikeResponse(
         post_id=post_id,
