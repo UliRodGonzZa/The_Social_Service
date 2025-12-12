@@ -624,7 +624,7 @@ def get_user_feed(
     followed_usernames: List[str] = []
 
     if mode in (FeedMode.all, FeedMode.following_only):
-        # Obtener a quién sigue desde Neo4j
+        # Obtener a quién sigue desde Neo4j (o MongoDB como fallback)
         try:
             driver = get_neo4j_driver()
             with driver.session() as session:
@@ -640,9 +640,14 @@ def get_user_feed(
                     if uname and uname not in followed_usernames:
                         followed_usernames.append(uname)
             driver.close()
-        except Exception:
-            # si Neo4j falla, simplemente no añadimos seguidos
-            pass
+        except Exception as e:
+            print(f"⚠️ Neo4j no disponible para feed, usando MongoDB: {e}")
+            # Fallback: leer de MongoDB
+            follows_col = db["follows"]
+            for doc in follows_col.find({"follower": username}):
+                uname = doc.get("following")
+                if uname and uname not in followed_usernames:
+                    followed_usernames.append(uname)
 
         authors.extend([u for u in followed_usernames if u not in authors])
 
