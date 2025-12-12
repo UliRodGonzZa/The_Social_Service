@@ -108,6 +108,15 @@ function App() {
         />
         
         <Route 
+          path="/observability" 
+          element={
+            <ProtectedRoute>
+              <ObservabilityPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
           path="/profile/:username" 
           element={
             <ProtectedRoute>
