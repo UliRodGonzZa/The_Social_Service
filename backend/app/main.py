@@ -657,11 +657,12 @@ def get_user_feed(
             )
         )
 
+    # Intentar guardar en cache (best effort)
     if r is not None:
         try:
             r.setex(cache_key, 60, json.dumps([p.dict() for p in posts]))
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"⚠️ No se pudo guardar en cache: {e}")
 
     return posts
 
