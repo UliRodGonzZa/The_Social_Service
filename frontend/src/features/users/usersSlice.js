@@ -72,6 +72,23 @@ export const followUser = createAsyncThunk(
   }
 );
 
+/**
+ * Unfollow user
+ * 
+ * Backend: DELETE /users/{username}/follow/{target}
+ */
+export const unfollowUser = createAsyncThunk(
+  'users/unfollowUser',
+  async ({ username, targetUsername }, { rejectWithValue }) => {
+    try {
+      const response = await usersAPI.unfollowUser(username, targetUsername);
+      return { ...response.data, targetUsername };
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.detail || 'Error al dejar de seguir usuario');
+    }
+  }
+);
+
 const usersSlice = createSlice({
   name: 'users',
   initialState,
