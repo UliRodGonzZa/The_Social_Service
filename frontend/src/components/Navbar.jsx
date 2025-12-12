@@ -13,6 +13,7 @@ import {
   FiMessageSquare,
   FiLogOut,
   FiTrendingUp,
+  FiActivity,
 } from "react-icons/fi";
 import { logout } from "../features/auth/authSlice";
 
