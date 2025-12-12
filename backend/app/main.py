@@ -462,6 +462,7 @@ def list_following(username: str):
 
     user_id = str(user_doc["_id"])
 
+    following = []
     try:
         driver = get_neo4j_driver()
         with driver.session() as session:
@@ -486,10 +487,23 @@ def list_following(username: str):
             ]
         driver.close()
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error al consultar Neo4j: {e}",
-        )
+        print(f"⚠️ Neo4j no disponible para following, usando MongoDB: {e}")
+        # Fallback: leer de MongoDB
+        follows_col = db["follows"]
+        for doc in follows_col.find({"follower": username}):
+            following_username = doc.get("following")
+            if following_username:
+                # Obtener datos del usuario desde MongoDB
+                following_user = users_col.find_one({"username": following_username})
+                if following_user:
+                    following.append(
+                        FollowingOut(
+                            username=following_user.get("username"),
+                            name=following_user.get("name"),
+                            bio=following_user.get("bio"),
+                            email=following_user.get("email"),
+                        )
+                    )
 
     return following
 
