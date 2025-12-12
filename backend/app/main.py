@@ -1084,40 +1084,45 @@ def unlike_post(post_id: str, username: str):
     """
     Quitar like de un post
     """
-    redis_client = get_redis_client()
-    
-    likes_count_key = f"post:{post_id}:likes:count"
-    likes_users_key = f"post:{post_id}:likes:users"
+    db = get_mongo_db()
+    likes_col = db["likes"]
     
     # Verificar si había dado like
-    if not redis_client.sismember(likes_users_key, username):
+    existing_like = likes_col.find_one({"post_id": post_id, "username": username})
+    if not existing_like:
         # No había dado like
-        count = redis_client.get(likes_count_key)
+        count = likes_col.count_documents({"post_id": post_id})
         return LikeResponse(
             post_id=post_id,
-            likes_count=int(count) if count else 0,
+            likes_count=count,
             user_liked=False
         )
     
-    # Pipeline atómico
-    pipe = redis_client.pipeline()
-    pipe.decr(likes_count_key)
-    pipe.srem(likes_users_key, username)
-    pipe.zincrby("trending:posts", -1, post_id)
-    results = pipe.execute()
+    # Eliminar like de MongoDB
+    likes_col.delete_one({"post_id": post_id, "username": username})
+    new_count = likes_col.count_documents({"post_id": post_id})
     
-    new_count = max(0, results[0])  # No permitir negativos
+    # Intentar con Redis (opcional)
+    try:
+        redis_client = get_redis_client()
+        likes_count_key = f"post:{post_id}:likes:count"
+        likes_users_key = f"post:{post_id}:likes:users"
+        pipe = redis_client.pipeline()
+        pipe.set(likes_count_key, new_count)
+        pipe.srem(likes_users_key, username)
+        pipe.zincrby("trending:posts", -1, post_id)
+        pipe.execute()
+    except Exception as e:
+        print(f"⚠️ Redis no disponible para unlike: {e}")
     
-    # Eliminar relación en Neo4j
+    # Eliminar relación en Neo4j (opcional)
     try:
         driver = get_neo4j_driver()
         with driver.session() as session:
-            db = get_mongo_db()
             users_col = db["users"]
             user_doc = users_col.find_one({"username": username})
             if user_doc:
                 user_id = str(user_doc["_id"])
-                
                 session.run(
                     """
                     MATCH (u:User {id: $user_id})-[r:LIKES]->(p:Post {id: $post_id})
@@ -1128,7 +1133,7 @@ def unlike_post(post_id: str, username: str):
                 )
         driver.close()
     except Exception as e:
-        print(f"Warning: Error deleting LIKES relationship in Neo4j: {e}")
+        print(f"⚠️ Neo4j no disponible para unlike: {e}")
     
     return LikeResponse(
         post_id=post_id,
