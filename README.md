@@ -82,6 +82,8 @@ Crea `/frontend/.env`:
 REACT_APP_BACKEND_URL=http://localhost:8001
 ```
 
+**⚠️ IMPORTANTE**: El frontend DEBE apuntar al puerto donde corre el backend (8001 por defecto).
+
 ### 🐍 Paso 4: Configurar el Backend
 
 ```bash
