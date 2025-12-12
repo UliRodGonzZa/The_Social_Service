@@ -55,7 +55,7 @@ services:
     env_file:
       - .env
     environment:
-      - API_URL=http://redk_api:8000   # <- CAMBIAR AQUÍ
+      - API_URL=http://redk_api:8000/api
     depends_on:
       - api
     entrypoint: ["sleep", "infinity"]

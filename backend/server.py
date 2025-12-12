@@ -1,57 +1,41 @@
+# backend/server.py
+
 """
-Server entry point
-Imports the FastAPI app from app.main
-Configura para que funcione con /api prefix
+Punto de entrada del servidor.
+
+Envuelve la app principal (app.main:app) y la monta bajo el prefijo /api,
+de modo que los endpoints queden como:
+
+    /api/health
+    /api/users/
+    /api/posts/
+    etc.
 """
 
-from app.main import app as original_app
 from fastapi import FastAPI
+from app.main import app as api_app  # esta es la app que definiste en main.py
 
-# Crear app wrapper que maneje /api y sin /api
 app = FastAPI(title="Red K - API Wrapper")
 
 # Montar la app original en /api
-app.mount("/api", original_app)
+app.mount("/api", api_app)
 
-# También en la raíz para requests locales
+
+# Opcional: endpoint raíz para comprobar que el wrapper está vivo
 @app.get("/")
 def root():
-    return {"message": "Red K API corriendo dentro de Docker 🐳"}
-
-@app.get("/health")
-async def health():
-    from app.main import get_mongo_db, get_redis_client, get_neo4j_driver
-    try:
-        mongo_ok = get_mongo_db() is not None
-        mongo_error = None
-    except Exception as e:
-        mongo_ok = False
-        mongo_error = str(e)
-
-    try:
-        redis_ok = get_redis_client() is not None
-        redis_error = None
-    except Exception as e:
-        redis_ok = False
-        redis_error = str(e)
-
-    try:
-        neo4j_ok = get_neo4j_driver() is not None
-        neo4j_error = None
-    except Exception as e:
-        neo4j_ok = False
-        neo4j_error = str(e)
-
-    status = "ok" if all([mongo_ok, redis_ok, neo4j_ok]) else "degraded"
-
     return {
-        "status": status,
-        "mongo": mongo_ok,
-        "mongo_error": mongo_error,
-        "redis": redis_ok,
-        "redis_error": redis_error,
-        "neo4j": neo4j_ok,
-        "neo4j_error": neo4j_error,
+        "message": "Red K API wrapper running. La API real está bajo /api"
     }
 
-__all__ = ['app']
+
+# Opcional: seguir exponiendo /health en la raíz (además de /api/health)
+# Reutilizamos la función health_check que ya definiste en main.py
+from app.main import health_check as inner_health_check
+
+@app.get("/health")
+def health():
+    """
+    Proxy al /health original de app.main (que ahora vive en /api/health).
+    """
+    return inner_health_check()

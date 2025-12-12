@@ -43,17 +43,11 @@ cd red-k
 
 ### 🗄️ Paso 2: Levantar las Bases de Datos
 
-El proyecto incluye un `docker-compose.local.yml` para desarrollo local (solo bases de datos):
+El proyecto incluye un `docker-compose.yml` configurado:
 
 ```bash
 # Desde la raíz del proyecto
-docker-compose -f docker-compose.local.yml up -d
-```
-
-**Alternativa** - Si prefieres usar el docker-compose.yml completo:
-```bash
-# Necesitas tener el archivo .env en la raíz
-docker-compose up -d mongo redis neo4j
+docker-compose up -d
 ```
 
 Esto iniciará:
@@ -63,8 +57,6 @@ Esto iniciará:
 
 **Verificar servicios:**
 ```bash
-docker-compose -f docker-compose.local.yml ps
-# O
 docker-compose ps
 ```
 
@@ -405,25 +397,18 @@ red-k/
 ## 🚀 Comandos Útiles
 
 ```bash
-# Detener todo (usando docker-compose.local.yml)
-docker-compose -f docker-compose.local.yml down
+# Detener todo
+docker-compose down
 # Ctrl+C en terminales de backend y frontend
 
-# Detener todo (usando docker-compose.yml)
-docker-compose down
-
 # Limpiar bases de datos (¡CUIDADO!)
-docker-compose -f docker-compose.local.yml down -v
-# O
 docker-compose down -v
 
 # Reiniciar un servicio
-docker-compose -f docker-compose.local.yml restart mongo
-# O
 docker-compose restart mongo
 
 # Ver logs
-docker-compose -f docker-compose.local.yml logs -f mongo
+docker-compose logs -f mongo
 docker-compose logs -f redis
 docker-compose logs -f neo4j
 
