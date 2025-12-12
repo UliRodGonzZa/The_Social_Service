@@ -915,16 +915,17 @@ def list_conversations(username: str):
     - timestamp del último mensaje
     - número de mensajes no leídos
     """
-    print(f"🔍 DEBUG START: list_conversations called for username={username}")
+    import sys
+    print(f"🔍 DEBUG START: list_conversations called for username={username}", file=sys.stderr, flush=True)
     db = get_mongo_db()
-    print(f"🔍 DEBUG: Database obtained: {db.name}")
+    print(f"🔍 DEBUG: Database obtained: {db.name}", file=sys.stderr, flush=True)
     users_col = db["users"]
     dms_col = db["dms"]
 
     user_doc = users_col.find_one({"username": username})
-    print(f"🔍 DEBUG conversations: username={username}, found={user_doc is not None}, user_doc={user_doc}")
+    print(f"🔍 DEBUG conversations: username={username}, found={user_doc is not None}, user_doc={user_doc}", file=sys.stderr, flush=True)
     if not user_doc:
-        print(f"❌ DEBUG: Usuario '{username}' no encontrado en la colección")
+        print(f"❌ DEBUG: Usuario '{username}' no encontrado en la colección", file=sys.stderr, flush=True)
         raise HTTPException(status_code=404, detail=f"Usuario '{username}' no encontrado en MongoDB [DEBUG v2]")
 
     # Traemos todos los mensajes donde participa
