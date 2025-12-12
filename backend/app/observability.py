@@ -85,6 +85,44 @@ class ClusterSlotsResponse(BaseModel):
 
 
 # ============================================================================
+# Modelos para Sprint 2: Messaging Metrics
+# ============================================================================
+
+class MessagingRateMetrics(BaseModel):
+    """Métricas de tasa de mensajes"""
+    messages_per_minute: int
+    messages_per_second: float
+    total_messages_today: int
+    peak_minute: Optional[int] = None
+    active_conversations: int
+
+
+class PresenceMetrics(BaseModel):
+    """Métricas de presencia"""
+    total_online: int
+    total_typing: int
+    users_online: List[str]
+    typing_in_chats: Dict[str, List[str]]  # {chatId: [usernames]}
+
+
+class UnreadMetrics(BaseModel):
+    """Métricas de mensajes no leídos"""
+    total_unread_messages: int
+    users_with_unread: int
+    top_conversations: List[Dict[str, Any]]  # Lista de conversaciones con más no leídos
+    average_unread_per_user: float
+
+
+class MessagingMetricsResponse(BaseModel):
+    """Respuesta completa de métricas de mensajería"""
+    mode: str
+    timestamp: str
+    rate: MessagingRateMetrics
+    presence: PresenceMetrics
+    unread: UnreadMetrics
+
+
+# ============================================================================
 # Funciones Helper - Conexión a Redis Cluster
 # ============================================================================
 
