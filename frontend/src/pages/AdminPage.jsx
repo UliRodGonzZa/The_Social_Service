@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Users, FileText, MessageSquare, TrendingUp, Calendar, Activity } from 'lucide-react';
+import Navbar from '../components/Navbar';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -54,12 +52,17 @@ function AdminPage() {
     }
   };
 
+  const [activeTab, setActiveTab] = useState('overview');
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando estadísticas...</p>
+      <div className="flex">
+        <Navbar />
+        <div className="flex-1 ml-64 flex items-center justify-center min-h-screen bg-dark-bg">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto"></div>
+            <p className="mt-4 text-text-secondary">Cargando estadísticas...</p>
+          </div>
         </div>
       </div>
     );
@@ -67,260 +70,230 @@ function AdminPage() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-red-600">Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
+      <div className="flex">
+        <Navbar />
+        <div className="flex-1 ml-64 flex items-center justify-center min-h-screen bg-dark-bg">
+          <div className="bg-dark-card p-6 rounded-lg max-w-md w-full border border-dark-border">
+            <h2 className="text-xl font-bold text-red-600 mb-4">Error</h2>
+            <p className="text-text-secondary mb-4">{error}</p>
             <button
               onClick={fetchAdminStats}
-              className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+              className="w-full bg-accent text-white py-2 rounded-lg hover:bg-accent-dark transition-colors"
             >
               Reintentar
             </button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Panel de Administrador</h1>
-        <p className="text-gray-600">Métricas y estadísticas de la aplicación</p>
-      </div>
-
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Resumen</TabsTrigger>
-          <TabsTrigger value="users">Usuarios</TabsTrigger>
-          <TabsTrigger value="posts">Posts</TabsTrigger>
-          <TabsTrigger value="messages">Mensajes</TabsTrigger>
-        </TabsList>
-
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Usuarios</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{summary?.total_users || 0}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {summary?.active_users_last_7d || 0} activos últimos 7 días
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Posts</CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{summary?.total_posts || 0}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {summary?.posts_last_7d || 0} posts últimos 7 días
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Mensajes</CardTitle>
-                <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{summary?.total_dms || 0}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {summary?.dms_last_7d || 0} mensajes últimos 7 días
-                </p>
-              </CardContent>
-            </Card>
+    <div className="flex bg-dark-bg min-h-screen">
+      <Navbar />
+      <div className="flex-1 ml-64">
+        <div className="container mx-auto p-6 max-w-7xl">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-white mb-2">Panel de Administrador</h1>
+            <p className="text-text-secondary">Métricas y estadísticas de la aplicación</p>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Actividad Reciente</CardTitle>
-              <CardDescription>Métricas de los últimos 7 días</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center">
-                  <Activity className="h-5 w-5 text-green-600 mr-3" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Usuarios Activos</p>
-                    <p className="text-xs text-gray-500">Usuarios que publicaron o enviaron mensajes</p>
-                  </div>
-                  <span className="text-2xl font-bold">{summary?.active_users_last_7d || 0}</span>
+          {/* Tabs */}
+          <div className="mb-6">
+            <div className="flex space-x-1 bg-dark-card p-1 rounded-lg border border-dark-border">
+              {['overview', 'users', 'posts', 'messages'].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+                    activeTab === tab
+                      ? 'bg-accent text-white'
+                      : 'text-text-secondary hover:text-white'
+                  }`}
+                >
+                  {tab === 'overview' && 'Resumen'}
+                  {tab === 'users' && 'Usuarios'}
+                  {tab === 'posts' && 'Posts'}
+                  {tab === 'messages' && 'Mensajes'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Overview Tab */}
+          {activeTab === 'overview' && (
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="bg-dark-card p-6 rounded-lg border border-dark-border">
+                  <h3 className="text-sm font-medium text-text-secondary mb-2">Total Usuarios</h3>
+                  <div className="text-3xl font-bold text-white">{summary?.total_users || 0}</div>
+                  <p className="text-xs text-text-secondary mt-2">
+                    {summary?.active_users_last_7d || 0} activos últimos 7 días
+                  </p>
                 </div>
-                
-                <div className="flex items-center">
-                  <TrendingUp className="h-5 w-5 text-blue-600 mr-3" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Engagement Rate</p>
-                    <p className="text-xs text-gray-500">Posts + Mensajes por usuario activo</p>
-                  </div>
-                  <span className="text-2xl font-bold">
-                    {summary?.active_users_last_7d > 0 
-                      ? ((summary?.posts_last_7d + summary?.dms_last_7d) / summary?.active_users_last_7d).toFixed(1)
-                      : 0}
-                  </span>
+
+                <div className="bg-dark-card p-6 rounded-lg border border-dark-border">
+                  <h3 className="text-sm font-medium text-text-secondary mb-2">Total Posts</h3>
+                  <div className="text-3xl font-bold text-white">{summary?.total_posts || 0}</div>
+                  <p className="text-xs text-text-secondary mt-2">
+                    {summary?.posts_last_7d || 0} posts últimos 7 días
+                  </p>
+                </div>
+
+                <div className="bg-dark-card p-6 rounded-lg border border-dark-border">
+                  <h3 className="text-sm font-medium text-text-secondary mb-2">Total Mensajes</h3>
+                  <div className="text-3xl font-bold text-white">{summary?.total_dms || 0}</div>
+                  <p className="text-xs text-text-secondary mt-2">
+                    {summary?.dms_last_7d || 0} mensajes últimos 7 días
+                  </p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        {/* Users Tab */}
-        <TabsContent value="users" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Usuarios por Posts</CardTitle>
-              <CardDescription>Usuarios con más publicaciones</CardDescription>
-            </CardHeader>
-            <CardContent>
+              <div className="bg-dark-card p-6 rounded-lg border border-dark-border">
+                <h3 className="text-lg font-bold text-white mb-4">Actividad Reciente</h3>
+                <p className="text-text-secondary text-sm mb-4">Métricas de los últimos 7 días</p>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-dark-bg rounded-lg">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-white">Usuarios Activos</p>
+                      <p className="text-xs text-text-secondary">Usuarios que publicaron o enviaron mensajes</p>
+                    </div>
+                    <span className="text-2xl font-bold text-accent">{summary?.active_users_last_7d || 0}</span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-4 bg-dark-bg rounded-lg">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-white">Engagement Rate</p>
+                      <p className="text-xs text-text-secondary">Posts + Mensajes por usuario activo</p>
+                    </div>
+                    <span className="text-2xl font-bold text-accent">
+                      {summary?.active_users_last_7d > 0 
+                        ? ((summary?.posts_last_7d + summary?.dms_last_7d) / summary?.active_users_last_7d).toFixed(1)
+                        : 0}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Users Tab */}
+          {activeTab === 'users' && (
+            <div className="bg-dark-card p-6 rounded-lg border border-dark-border">
+              <h3 className="text-lg font-bold text-white mb-4">Top Usuarios por Posts</h3>
+              <p className="text-text-secondary text-sm mb-4">Usuarios con más publicaciones</p>
               {topPosters.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">No hay datos disponibles</p>
+                <p className="text-text-secondary text-center py-4">No hay datos disponibles</p>
               ) : (
                 <div className="space-y-3">
                   {topPosters.map((poster, index) => (
-                    <div key={poster.username} className="flex items-center space-x-4">
-                      <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                        index === 0 ? 'bg-yellow-100 text-yellow-700' :
-                        index === 1 ? 'bg-gray-100 text-gray-700' :
-                        index === 2 ? 'bg-orange-100 text-orange-700' :
-                        'bg-blue-100 text-blue-700'
-                      } font-bold text-sm`}>
+                    <div key={poster.username} className="flex items-center space-x-4 p-3 bg-dark-bg rounded-lg">
+                      <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
+                        index === 0 ? 'bg-yellow-500 text-dark-bg' :
+                        index === 1 ? 'bg-gray-400 text-dark-bg' :
+                        index === 2 ? 'bg-orange-500 text-dark-bg' :
+                        'bg-accent text-white'
+                      } font-bold text-lg`}>
                         {index + 1}
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium">@{poster.username}</p>
+                        <p className="font-medium text-white">@{poster.username}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-2xl font-bold">{poster.posts_count}</p>
-                        <p className="text-xs text-gray-500">posts</p>
+                        <p className="text-2xl font-bold text-accent">{poster.posts_count}</p>
+                        <p className="text-xs text-text-secondary">posts</p>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
+          )}
 
-        {/* Posts Tab */}
-        <TabsContent value="posts" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Posts por Día</CardTitle>
-              <CardDescription>Últimos 7 días</CardDescription>
-            </CardHeader>
-            <CardContent>
+          {/* Posts Tab */}
+          {activeTab === 'posts' && (
+            <div className="bg-dark-card p-6 rounded-lg border border-dark-border">
+              <h3 className="text-lg font-bold text-white mb-4">Posts por Día</h3>
+              <p className="text-text-secondary text-sm mb-4">Últimos 7 días</p>
               {postsByDay.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">No hay datos disponibles</p>
+                <p className="text-text-secondary text-center py-4">No hay datos disponibles</p>
               ) : (
                 <div className="space-y-2">
                   {postsByDay.map((day) => (
-                    <div key={day.date} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div key={day.date} className="flex items-center justify-between p-3 bg-dark-bg rounded-lg">
+                      <span className="font-medium text-white">{day.date}</span>
                       <div className="flex items-center space-x-3">
-                        <Calendar className="h-5 w-5 text-gray-600" />
-                        <span className="font-medium">{day.date}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="h-2 bg-blue-600 rounded" style={{ width: `${day.count * 20}px` }}></div>
-                        <span className="font-bold text-blue-600">{day.count}</span>
+                        <div className="h-3 bg-accent rounded" style={{ width: `${Math.max(day.count * 30, 20)}px` }}></div>
+                        <span className="font-bold text-accent text-lg">{day.count}</span>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
+          )}
 
-        {/* Messages Tab */}
-        <TabsContent value="messages" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Mensajes</CardTitle>
-                <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{dmStats?.total_dms || 0}</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Mensajes No Leídos</CardTitle>
-                <MessageSquare className="h-4 w-4 text-red-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">{dmStats?.unread_dms || 0}</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Usuarios con DMs</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{dmStats?.users_with_dms || 0}</div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Estadísticas de Mensajería</CardTitle>
-              <CardDescription>Análisis de la actividad de mensajes directos</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                  <div>
-                    <p className="font-medium">Mensajes Leídos</p>
-                    <p className="text-sm text-gray-600">Porcentaje de mensajes leídos</p>
-                  </div>
-                  <span className="text-2xl font-bold text-blue-600">
-                    {dmStats?.total_dms > 0 
-                      ? (((dmStats?.total_dms - dmStats?.unread_dms) / dmStats?.total_dms) * 100).toFixed(1)
-                      : 0}%
-                  </span>
+          {/* Messages Tab */}
+          {activeTab === 'messages' && (
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="bg-dark-card p-6 rounded-lg border border-dark-border">
+                  <h3 className="text-sm font-medium text-text-secondary mb-2">Total Mensajes</h3>
+                  <div className="text-3xl font-bold text-white">{dmStats?.total_dms || 0}</div>
                 </div>
 
-                <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
-                  <div>
-                    <p className="font-medium">Promedio de Mensajes</p>
-                    <p className="text-sm text-gray-600">Por usuario con actividad</p>
-                  </div>
-                  <span className="text-2xl font-bold text-green-600">
-                    {dmStats?.users_with_dms > 0 
-                      ? (dmStats?.total_dms / dmStats?.users_with_dms).toFixed(1)
-                      : 0}
-                  </span>
+                <div className="bg-dark-card p-6 rounded-lg border border-dark-border">
+                  <h3 className="text-sm font-medium text-text-secondary mb-2">Mensajes No Leídos</h3>
+                  <div className="text-3xl font-bold text-red-500">{dmStats?.unread_dms || 0}</div>
+                </div>
+
+                <div className="bg-dark-card p-6 rounded-lg border border-dark-border">
+                  <h3 className="text-sm font-medium text-text-secondary mb-2">Usuarios con DMs</h3>
+                  <div className="text-3xl font-bold text-white">{dmStats?.users_with_dms || 0}</div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
 
-      <div className="mt-6 text-center">
-        <button
-          onClick={fetchAdminStats}
-          className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
-        >
-          Actualizar Estadísticas
-        </button>
+              <div className="bg-dark-card p-6 rounded-lg border border-dark-border">
+                <h3 className="text-lg font-bold text-white mb-4">Estadísticas de Mensajería</h3>
+                <p className="text-text-secondary text-sm mb-4">Análisis de la actividad de mensajes directos</p>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-blue-900/20 rounded-lg border border-blue-700/50">
+                    <div>
+                      <p className="font-medium text-white">Mensajes Leídos</p>
+                      <p className="text-sm text-text-secondary">Porcentaje de mensajes leídos</p>
+                    </div>
+                    <span className="text-2xl font-bold text-blue-400">
+                      {dmStats?.total_dms > 0 
+                        ? (((dmStats?.total_dms - dmStats?.unread_dms) / dmStats?.total_dms) * 100).toFixed(1)
+                        : 0}%
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-green-900/20 rounded-lg border border-green-700/50">
+                    <div>
+                      <p className="font-medium text-white">Promedio de Mensajes</p>
+                      <p className="text-sm text-text-secondary">Por usuario con actividad</p>
+                    </div>
+                    <span className="text-2xl font-bold text-green-400">
+                      {dmStats?.users_with_dms > 0 
+                        ? (dmStats?.total_dms / dmStats?.users_with_dms).toFixed(1)
+                        : 0}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-6 text-center">
+            <button
+              onClick={fetchAdminStats}
+              className="px-6 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors"
+            >
+              Actualizar Estadísticas
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
