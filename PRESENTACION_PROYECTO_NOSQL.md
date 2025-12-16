@@ -290,7 +290,10 @@ El tiempo de expiración balancea frescura de datos vs hits de cache. Posts anti
 
 #### Modelo de Datos:
 
-##### 👤 Nodos: User
+##### Nodos: User
+
+**Implementación:** `/app/backend/app/main.py` - Líneas 271-286
+
 ```cypher
 (:User {
   id: "user_mongo_id",
@@ -301,7 +304,35 @@ El tiempo de expiración balancea frescura de datos vs hits de cache. Posts anti
 })
 ```
 
-##### 📝 Nodos: Post
+**Creación del nodo:**
+```python
+# Línea 271-286
+session.run(
+    """
+    MERGE (u:User {id: $id})
+    SET u.username = $username,
+        u.email = $email,
+        u.name = $name,
+        u.bio = $bio
+    """,
+    id=user_id,
+    username=user.username,
+    email=user.email,
+    name=user.name,
+    bio=user.bio,
+)
+```
+
+**Decisión de diseño:**
+MERGE en lugar de CREATE evita duplicados. Si el nodo ya existe con ese id, solo actualiza las propiedades. El id referencia al _id de MongoDB, manteniendo consistencia entre bases de datos.
+
+**Texto para presentación:**
+"Los nodos User en Neo4j se crean con MERGE, no CREATE. MERGE es idempotente: si el nodo existe, lo actualiza; si no existe, lo crea. Esto es importante para tolerancia a fallos. El campo id apunta al ObjectId de MongoDB, actuando como foreign key entre las dos bases de datos. Esto permite que Neo4j maneje solo las relaciones mientras MongoDB maneja los datos completos del perfil."
+
+##### Nodos: Post
+
+**Implementación:** `/app/backend/app/main.py` - Líneas 536-550
+
 ```cypher
 (:Post {
   id: "post_mongo_id",
@@ -310,27 +341,132 @@ El tiempo de expiración balancea frescura de datos vs hits de cache. Posts anti
 })
 ```
 
-##### 🔗 Relaciones:
+**Creación del nodo:**
+```python
+# Línea 536-550
+session.run(
+    """
+    MERGE (u:User {id: $user_id})
+    SET u.username = $username
+    MERGE (p:Post {id: $post_id})
+    SET p.content = $content,
+        p.created_at = $created_at
+    MERGE (u)-[:POSTED]->(p)
+    """,
+    user_id=user_id,
+    username=post.author_username,
+    post_id=post_id,
+    content=post.content,
+    created_at=created_at,
+)
+```
+
+**Decisión de diseño:**
+Se crea el nodo Post junto con la relación POSTED en una sola transacción. Esto garantiza consistencia: nunca existirá un Post sin su autor, ni una relación POSTED sin los nodos correspondientes.
+
+**Texto para presentación:**
+"Cuando se crea un post, ejecutamos una transacción en Neo4j que hace tres cosas atómicamente: MERGE del User, MERGE del Post, y MERGE de la relación POSTED. Si alguna parte falla, todo se revierte. Guardamos content y created_at en el nodo Post para poder hacer queries de grafos que filtren por tiempo o contenido, sin necesidad de ir a MongoDB."
+
+##### Relaciones:
 
 **FOLLOWS** - Un usuario sigue a otro
+
+**Implementación:** `/app/backend/app/main.py` - Líneas 321-337
+
 ```cypher
 (rodrigo:User)-[:FOLLOWS]->(kam:User)
 ```
 
+**Creación:**
+```python
+# Línea 321-337
+session.run(
+    """
+    MERGE (u:User {id: $user_id})
+    SET u.username = $user_username
+    MERGE (t:User {id: $target_id})
+    SET t.username = $target_username
+    MERGE (u)-[:FOLLOWS]->(t)
+    """,
+    user_id=user_id,
+    user_username=username,
+    target_id=target_id,
+    target_username=target_username,
+)
+```
+
+**Por qué relación dirigida:**
+FOLLOWS es direccional: que yo siga a alguien no significa que me siga de vuelta. Neo4j permite relaciones dirigidas nativas, a diferencia de MongoDB donde necesitaríamos dos arrays (following, followers) o una collection separada con dos campos.
+
+**Texto para presentación:**
+"La relación FOLLOWS es dirigida, lo cual Neo4j maneja nativamente. En MongoDB, necesitaríamos mantener dos arrays sincronizados o una collection de relaciones. Con Neo4j, simplemente hacemos MERGE de la relación dirigida. Para encontrar seguidores, recorremos la relación al revés: MATCH (follower)-[:FOLLOWS]->(yo). Para encontrar a quién sigo, la recorremos normal: MATCH (yo)-[:FOLLOWS]->(following). Esto es O(1) en Neo4j porque las relaciones están indexadas bidireccionalmente."
+
 **POSTED** - Un usuario crea un post
+
+**Implementación:** Líneas 536-550 (mostrado arriba)
+
 ```cypher
 (rodrigo:User)-[:POSTED]->(post:Post)
 ```
 
 **LIKES** - Un usuario le da like a un post
+
+**Implementación:** `/app/backend/app/main.py` - Líneas 1057-1074
+
 ```cypher
 (rodrigo:User)-[:LIKES]->(post:Post)
 ```
 
+**Creación:**
+```python
+# Línea 1062-1074
+session.run(
+    """
+    MERGE (u:User {id: $user_id})
+    MERGE (p:Post {id: $post_id})
+    MERGE (u)-[:LIKES]->(p)
+    """,
+    user_id=user_id,
+    post_id=post_id
+)
+```
+
+**Por qué en Neo4j si el contador está en Redis:**
+Redis maneja el contador agregado para rendimiento, pero Neo4j mantiene el grafo de quién le dio like a qué. Esto permite queries como "posts que les gustaron a mis amigos" que requieren traversals de grafo: MATCH (yo)-[:FOLLOWS]->(amigo)-[:LIKES]->(post). Esto es imposible de hacer eficientemente solo con Redis.
+
+**Texto para presentación:**
+"Guardamos LIKES en Neo4j aunque el contador esté en Redis porque necesitamos el grafo completo para recomendaciones. Por ejemplo, para sugerir posts basados en lo que les gusta a tus amigos, necesitamos recorrer: yo FOLLOWS amigo, amigo LIKES post. Este traversal de dos saltos es O(n) en Neo4j donde n es el número de amigos. En MongoDB requeriría múltiples queries y joins manuales, lo cual es O(n^2) o peor."
+
 **MESSAGED** - Comunicación entre usuarios (DMs)
+
+**Implementación:** `/app/backend/app/main.py` - Líneas 765-780
+
 ```cypher
 (rodrigo:User)-[:MESSAGED {last_message_at: "2025-12-12"}]->(kam:User)
 ```
+
+**Creación:**
+```python
+# Línea 765-780
+session.run(
+    """
+    MERGE (s:User {username: $sender})
+    MERGE (r:User {username: $receiver})
+    MERGE (s)-[rel:MESSAGED]->(r)
+    ON CREATE SET rel.last_message_at = $created_at
+    ON MATCH SET  rel.last_message_at = $created_at
+    """,
+    sender=dm.sender_username,
+    receiver=dm.receiver_username,
+    created_at=created_at,
+)
+```
+
+**Decisión de diseño:**
+ON CREATE SET vs ON MATCH SET actualiza el timestamp solo cuando hay actividad. Esto permite queries como "con quién he hablado recientemente" sin consultar MongoDB: MATCH (yo)-[m:MESSAGED]->() RETURN m ORDER BY m.last_message_at DESC.
+
+**Texto para presentación:**
+"La relación MESSAGED tiene una propiedad last_message_at que se actualiza cada vez que hay un mensaje. Usamos MERGE con ON CREATE y ON MATCH para que la relación se cree la primera vez y se actualice las veces subsiguientes. Esto nos da una vista rápida de conversaciones recientes sin consultar la colección dms en MongoDB. Es un patrón de desnormalización estratégica: duplicamos el timestamp para mejorar rendimiento de queries frecuentes."
 
 #### Consultas Principales:
 
