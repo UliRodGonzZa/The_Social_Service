@@ -1227,22 +1227,37 @@ def get_post_likes(post_id: str, username: str = None):
 def get_post_likes_users(post_id: str):
     """
     Obtener lista detallada de usuarios que dieron like a un post
+    
+    Usa Redis Set para obtener los usernames de forma eficiente:
+    - Key: "post:{post_id}:likes:users"
+    - Comando: SMEMBERS (obtiene todos los elementos del set)
     """
-    db = get_mongo_db()
-    likes_col = db["likes"]
-    users_col = db["users"]
-    
-    # Obtener todos los likes para este post
-    likes = list(likes_col.find({"post_id": post_id}))
-    likes_count = len(likes)
-    
-    # Obtener información de los usuarios
-    users_data = []
-    for like in likes:
-        username = like.get("username")
-        if username:
+    try:
+        redis_client = get_redis_client()
+        
+        # Keys en Redis
+        likes_users_key = f"post:{post_id}:likes:users"
+        likes_count_key = f"post:{post_id}:likes:count"
+        
+        # Obtener usernames del Set en Redis (SMEMBERS)
+        usernames_bytes = redis_client.smembers(likes_users_key)
+        usernames = [u.decode('utf-8') if isinstance(u, bytes) else u for u in usernames_bytes]
+        
+        # Obtener contador
+        count = redis_client.get(likes_count_key)
+        likes_count = int(count) if count else len(usernames)
+        
+        # Obtener información completa de los usuarios desde MongoDB
+        db = get_mongo_db()
+        users_col = db["users"]
+        
+        users_data = []
+        for username in usernames:
             # Buscar info del usuario
-            user_doc = users_col.find_one({"username": username}, {"_id": 0, "username": 1, "name": 1})
+            user_doc = users_col.find_one(
+                {"username": username}, 
+                {"_id": 0, "username": 1, "name": 1}
+            )
             if user_doc:
                 users_data.append(UserLike(
                     username=user_doc.get("username"),
@@ -1251,12 +1266,44 @@ def get_post_likes_users(post_id: str):
             else:
                 # Si no se encuentra el usuario, solo mostrar username
                 users_data.append(UserLike(username=username))
-    
-    return PostLikesDetail(
-        post_id=post_id,
-        likes_count=likes_count,
-        users=users_data
-    )
+        
+        return PostLikesDetail(
+            post_id=post_id,
+            likes_count=likes_count,
+            users=users_data
+        )
+        
+    except Exception as e:
+        print(f"Error obteniendo likes de Redis: {e}")
+        # Fallback a MongoDB si Redis falla
+        db = get_mongo_db()
+        likes_col = db["likes"]
+        users_col = db["users"]
+        
+        likes = list(likes_col.find({"post_id": post_id}))
+        likes_count = len(likes)
+        
+        users_data = []
+        for like in likes:
+            username = like.get("username")
+            if username:
+                user_doc = users_col.find_one(
+                    {"username": username}, 
+                    {"_id": 0, "username": 1, "name": 1}
+                )
+                if user_doc:
+                    users_data.append(UserLike(
+                        username=user_doc.get("username"),
+                        name=user_doc.get("name")
+                    ))
+                else:
+                    users_data.append(UserLike(username=username))
+        
+        return PostLikesDetail(
+            post_id=post_id,
+            likes_count=likes_count,
+            users=users_data
+        )
 
         likes_count=count,
         user_liked=user_liked
