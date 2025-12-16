@@ -11,9 +11,11 @@ from bson import ObjectId
 import redis
 from neo4j import GraphDatabase
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 from enum import Enum
+
+from app.mongo import get_mongo_db
 
 # Importar router de observability (opcional, puede no existir en local)
 try:
