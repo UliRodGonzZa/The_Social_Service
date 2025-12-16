@@ -832,3 +832,135 @@ async def get_messaging_metrics():
             status_code=500,
             detail=f"Error obteniendo messaging metrics: {str(e)}"
         )
+
+
+
+# ============================================================================
+# Sprint 3: Data Distribution Endpoint
+# ============================================================================
+
+class DataDistributionResponse(BaseModel):
+    """Respuesta del endpoint de distribución de datos"""
+    mode: str
+    timestamp: str
+    chat_id: str
+    slot: int
+    master_node: str
+    master_host: str
+    master_port: int
+
+
+def calculate_redis_slot(key: str) -> int:
+    """
+    Calcula el slot de Redis para una clave usando CRC16.
+    
+    Redis usa CRC16 % 16384 para determinar el slot.
+    """
+    import binascii
+    
+    # Extraer hash tag si existe (entre {})
+    # Ejemplo: chat:{alice::bob} -> usa "alice::bob" para el hash
+    if '{' in key:
+        start = key.index('{')
+        end = key.index('}', start)
+        if end > start + 1:
+            key = key[start + 1:end]
+    
+    # Calcular CRC16
+    crc = binascii.crc_hqx(key.encode('utf-8'), 0)
+    slot = crc % 16384
+    
+    return slot
+
+
+def find_master_for_slot(slot: int, slot_distributions: List[SlotDistribution]) -> Optional[SlotDistribution]:
+    """
+    Encuentra el master que maneja un slot específico.
+    """
+    for dist in slot_distributions:
+        # Parsear rango "0-5460"
+        start, end = map(int, dist.slot_range.split('-'))
+        if start <= slot <= end:
+            return dist
+    return None
+
+
+@router.get("/cluster/distribution", response_model=DataDistributionResponse)
+async def get_data_distribution(chat_id: str):
+    """
+    Sprint 3: Mapea un chatId a su slot y nodo master en el cluster.
+    
+    Proceso:
+    1. Calcula el slot usando CRC16(chat_id) % 16384
+    2. Busca qué master maneja ese slot
+    3. Retorna: chatId → slot → master node
+    
+    Útil para entender cómo Redis distribuye las claves en el cluster.
+    """
+    
+    # Calcular slot
+    slot = calculate_redis_slot(chat_id)
+    
+    # Modo mock
+    if OBSERVABILITY_MODE == "mock":
+        # Determinar master basado en el slot
+        if slot <= 5460:
+            master_node = "abc123master1"
+            master_host = "redis-master-1"
+            master_port = 7000
+        elif slot <= 10922:
+            master_node = "ghi789master2"
+            master_host = "redis-master-2"
+            master_port = 7001
+        else:
+            master_node = "mno345master3"
+            master_host = "redis-master-3"
+            master_port = 7002
+        
+        return DataDistributionResponse(
+            mode="mock",
+            timestamp=datetime.utcnow().isoformat(),
+            chat_id=chat_id,
+            slot=slot,
+            master_node=master_node,
+            master_host=master_host,
+            master_port=master_port,
+        )
+    
+    # Modo production
+    try:
+        # Obtener distribución de slots
+        slots_response = await get_cluster_slots()
+        
+        # Buscar master para el slot
+        master_dist = find_master_for_slot(slot, slots_response.slot_distributions)
+        
+        if not master_dist:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No se encontró master para el slot {slot}"
+            )
+        
+        # Parsear host:port del master
+        host_port_parts = master_dist.master_ip_port.split(':')
+        master_host = host_port_parts[0]
+        master_port = int(host_port_parts[1]) if len(host_port_parts) > 1 else 0
+        
+        return DataDistributionResponse(
+            mode="production",
+            timestamp=datetime.utcnow().isoformat(),
+            chat_id=chat_id,
+            slot=slot,
+            master_node=master_dist.master_node,
+            master_host=master_host,
+            master_port=master_port,
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error en get_data_distribution: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error obteniendo distribución de datos: {str(e)}"
+        )
