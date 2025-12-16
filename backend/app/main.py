@@ -1221,6 +1221,43 @@ def get_post_likes(post_id: str, username: str = None):
     
     return LikeResponse(
         post_id=post_id,
+
+
+@app.get("/posts/{post_id}/likes/users", response_model=PostLikesDetail)
+def get_post_likes_users(post_id: str):
+    """
+    Obtener lista detallada de usuarios que dieron like a un post
+    """
+    db = get_mongo_db()
+    likes_col = db["likes"]
+    users_col = db["users"]
+    
+    # Obtener todos los likes para este post
+    likes = list(likes_col.find({"post_id": post_id}))
+    likes_count = len(likes)
+    
+    # Obtener información de los usuarios
+    users_data = []
+    for like in likes:
+        username = like.get("username")
+        if username:
+            # Buscar info del usuario
+            user_doc = users_col.find_one({"username": username}, {"_id": 0, "username": 1, "name": 1})
+            if user_doc:
+                users_data.append(UserLike(
+                    username=user_doc.get("username"),
+                    name=user_doc.get("name")
+                ))
+            else:
+                # Si no se encuentra el usuario, solo mostrar username
+                users_data.append(UserLike(username=username))
+    
+    return PostLikesDetail(
+        post_id=post_id,
+        likes_count=likes_count,
+        users=users_data
+    )
+
         likes_count=count,
         user_liked=user_liked
     )
