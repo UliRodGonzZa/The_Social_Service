@@ -1,12 +1,12 @@
-# 📊 Resumen Ejecutivo - Proyecto Red Social NoSQL
+# Resumen Ejecutivo - Proyecto Red Social NoSQL
 
-## 🎯 Elevator Pitch (30 segundos)
+## Elevator Pitch (30 segundos)
 
 **Red K** es una red social que implementa **Polyglot Persistence**, combinando MongoDB, Redis y Neo4j. Cada base de datos resuelve un problema específico: MongoDB para datos persistentes, Redis para tiempo real y cache, Neo4j para relaciones sociales.
 
 ---
 
-## 🗄️ Bases de Datos - ¿Qué hace cada una?
+##  Bases de Datos - ¿Qué hace cada una?
 
 | Base de Datos | Tipo | Puerto | Uso Principal | Ejemplo |
 |--------------|------|--------|---------------|---------|
@@ -39,10 +39,10 @@ feed:{user}:{mode}        → Cache del feed (String + TTL 60s)
 
 ---
 
-## 🔄 Ejemplo: ¿Qué pasa cuando das Like a un Post?
+##  Ejemplo: ¿Qué pasa cuando das Like a un Post?
 
 ```
-1. Frontend: Click en ❤️
+1. Frontend: Click en 
    ↓
 2. Backend: Redis
    - INCR post:abc:likes:count        (contador +1)
@@ -59,15 +59,15 @@ feed:{user}:{mode}        → Cache del feed (String + TTL 60s)
 
 ---
 
-## 🚀 Comandos para Correr el Proyecto
+##  Comandos para Correr el Proyecto
 
-### 1️⃣ Levantar Bases de Datos:
+### 1⃣ Levantar Bases de Datos:
 ```bash
 docker-compose up -d
 ```
 Esto levanta MongoDB, Redis y Neo4j automáticamente.
 
-### 2️⃣ Backend (FastAPI):
+### 2⃣ Backend (FastAPI):
 ```bash
 cd backend
 python3 -m venv venv
@@ -80,7 +80,7 @@ uvicorn server:app --reload --port 8001
 Servidor ASGI para FastAPI (como Gunicorn pero más rápido).  
 `--reload` = recarga automática al cambiar código.
 
-### 3️⃣ Frontend (React):
+### 3⃣ Frontend (React):
 ```bash
 cd frontend
 yarn install
@@ -92,7 +92,7 @@ Instala dependencias de `package.json` y levanta servidor de desarrollo en puert
 
 ---
 
-## 🏗️ Arquitectura del Sistema
+##  Arquitectura del Sistema
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -115,7 +115,7 @@ Instala dependencias de `package.json` y levanta servidor de desarrollo en puert
 
 ---
 
-## 📊 Endpoints Principales del API
+##  Endpoints Principales del API
 
 ### Usuarios:
 ```
@@ -141,24 +141,24 @@ GET    /api/dm/conversations/{user}              → Listar chats
 
 ---
 
-## 💡 Decisiones de Diseño Clave
+##  Decisiones de Diseño Clave
 
 ### 1. ¿Por qué usar 3 bases de datos?
 
 **MongoDB:**
-- ✅ Schema flexible para posts con diferentes formatos
-- ✅ Queries complejos con filtros y agregaciones
-- ✅ Almacenamiento persistente confiable
+-  Schema flexible para posts con diferentes formatos
+-  Queries complejos con filtros y agregaciones
+-  Almacenamiento persistente confiable
 
 **Redis:**
-- ⚡ Latencia <1ms para likes en tiempo real
-- ✅ Sorted Sets perfectos para trending
-- ✅ Expiración automática de cache (TTL)
+-  Latencia <1ms para likes en tiempo real
+-  Sorted Sets perfectos para trending
+-  Expiración automática de cache (TTL)
 
 **Neo4j:**
-- 🕸️ "Amigos de amigos" en una sola query
-- ✅ Sugerencias inteligentes basadas en grafo
-- ✅ Relaciones sociales son naturalmente un grafo
+-  "Amigos de amigos" en una sola query
+-  Sugerencias inteligentes basadas en grafo
+-  Relaciones sociales son naturalmente un grafo
 
 ### 2. Patrón de Cache-Aside
 
@@ -168,7 +168,7 @@ cache_key = f"feed:{username}:all:20"
 cached = redis.get(cache_key)
 
 if cached:
-    return json.loads(cached)  # ⚡ Rápido
+    return json.loads(cached)  #  Rápido
 
 # Si no existe, consulta MongoDB
 posts = mongo.find({...})
@@ -196,7 +196,7 @@ La app **nunca se cae** aunque alguna DB falle.
 
 ---
 
-## 📈 Métricas del Panel Admin
+##  Métricas del Panel Admin
 
 El endpoint `/api/admin/stats/summary` muestra:
 
@@ -222,7 +222,7 @@ db.posts.aggregate([
 
 ---
 
-## 🔍 Consulta Destacada: Sugerencias de Amigos
+##  Consulta Destacada: Sugerencias de Amigos
 
 **Problema:** Recomendar usuarios que probablemente conozcas.
 
@@ -257,7 +257,7 @@ LIMIT 10
 
 ---
 
-## 🎨 Stack Tecnológico
+##  Stack Tecnológico
 
 ### Backend:
 - **FastAPI** - Framework web Python
@@ -275,7 +275,7 @@ LIMIT 10
 
 ---
 
-## 🧪 Cómo Probar Funcionalidades
+##  Cómo Probar Funcionalidades
 
 ### 1. Crear Usuario:
 ```bash
@@ -313,7 +313,7 @@ RETURN u.username, f.username
 
 ---
 
-## 🎯 Puntos Clave para la Presentación
+##  Puntos Clave para la Presentación
 
 1. **Polyglot Persistence**: Cada DB hace lo que mejor sabe
 2. **Rendimiento**: Redis <1ms para likes en tiempo real
@@ -324,7 +324,7 @@ RETURN u.username, f.username
 
 ---
 
-## 🔗 Flujo Completo: Crear Post → Dar Like → Ver Trending
+##  Flujo Completo: Crear Post → Dar Like → Ver Trending
 
 ```
 1. POST /api/posts/ → MongoDB (insertar) + Neo4j (relación POSTED)
@@ -338,7 +338,7 @@ RETURN u.username, f.username
 
 ---
 
-## 📚 Archivos Importantes
+##  Archivos Importantes
 
 ```
 /app/PRESENTACION_PROYECTO_NOSQL.md    → Documentación completa
@@ -350,6 +350,6 @@ RETURN u.username, f.username
 
 ---
 
-**¡Éxito con tu presentación NoSQL! 🚀**
+**¡Éxito con tu presentación NoSQL! **
 
 **Recuerda:** El valor está en mostrar que entiendes **CUÁNDO y POR QUÉ** usar cada base de datos, no solo en hacerlas funcionar.
