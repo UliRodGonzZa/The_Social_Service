@@ -85,6 +85,12 @@ const Navbar = () => {
           to={`/profile/${currentUser?.username}`}
           testId="nav-profile"
         />
+        <NavItem
+          icon={<FiActivity />}
+          text="Admin"
+          to="/admin"
+          testId="nav-admin"
+        />
       </div>
 
       {/* User Info & Logout */}
