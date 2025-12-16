@@ -3,10 +3,9 @@ from pymongo.errors import ConnectionFailure
 import os
 
 # Carga URI desde variables de entorno
-# En Docker usarás: MONGO_URI=mongodb://mongo:27017
-# En local:         MONGO_URI=mongodb://localhost:27017
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "social_db")
+# La URI puede incluir el nombre de la DB: mongodb://host:port/dbname
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017/red_k")
+MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "red_k")
 
 _client = None
 _db = None
