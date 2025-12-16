@@ -17,9 +17,12 @@
 
 #### Colecciones y Datos:
 
-##### 📁 Colección `users`
+##### Colección `users`
 Almacena información de los usuarios.
 
+**Ubicación de creación:** `/app/backend/app/main.py` - Líneas 235-280 (endpoint POST /users/)
+
+**Esquema del documento:**
 ```javascript
 {
   "_id": ObjectId("..."),
@@ -32,14 +35,23 @@ Almacena información de los usuarios.
 }
 ```
 
-**Operaciones principales:**
-- `find()` - Buscar usuarios
-- `insert_one()` - Crear usuario
-- `update_one()` - Actualizar perfil
+**Decisión de diseño:**
+Se eligió MongoDB para usuarios porque permite un esquema flexible. Los campos following y followers se agregaron como fallback redundante: si Neo4j no está disponible, la aplicación puede seguir funcionando consultando estos arrays en MongoDB. Esto implementa el patrón de resiliencia.
 
-##### 📁 Colección `posts`
+**Operaciones principales:**
+- `users_col.find()` - Buscar usuarios (línea 289)
+- `users_col.insert_one()` - Crear usuario (línea 269)
+- `users_col.find_one()` - Buscar por username (línea 306)
+
+**Texto para presentación:**
+"La colección users se crea automáticamente en MongoDB cuando insertamos el primer usuario. Elegimos MongoDB por su capacidad de manejar documentos con esquemas variables. Por ejemplo, algunos usuarios pueden tener bio y otros no, sin necesidad de definir un esquema rígido. Las operaciones de lectura usan find() y find_one(), que son consultas O(1) cuando usamos índices en username."
+
+##### Colección `posts`
 Almacena las publicaciones de los usuarios.
 
+**Ubicación de creación:** `/app/backend/app/main.py` - Líneas 484-563 (endpoint POST /posts/)
+
+**Esquema del documento:**
 ```javascript
 {
   "_id": ObjectId("..."),
@@ -52,14 +64,23 @@ Almacena las publicaciones de los usuarios.
 }
 ```
 
-**Operaciones principales:**
-- `find()` - Listar posts
-- `insert_one()` - Crear post
-- `sort()` - Ordenar por fecha
+**Decisión de diseño:**
+MongoDB es ideal para posts porque permite almacenar contenido de longitud variable, arrays de tags sin límite predefinido, y timestamps en formato ISO. El campo likes como array sirve como fallback si Redis no está disponible. La consulta principal usa sort en created_at para ordenar cronológicamente.
 
-##### 📁 Colección `dms` (Direct Messages)
+**Operaciones principales:**
+- `posts_col.find()` - Listar posts (línea 609)
+- `posts_col.insert_one()` - Crear post (línea 529)
+- `posts_col.find().sort("created_at", -1)` - Ordenar por fecha descendente (línea 610)
+
+**Texto para presentación:**
+"Los posts se almacenan en MongoDB porque necesitamos persistencia y la capacidad de hacer consultas complejas. Por ejemplo, el feed personalizado requiere filtrar posts por múltiples autores usando el operador $in, lo cual MongoDB maneja eficientemente. El sort por created_at nos da orden cronológico inverso, mostrando los posts más recientes primero."
+
+##### Colección `dms` (Direct Messages)
 Almacena mensajes directos entre usuarios.
 
+**Ubicación de creación:** `/app/backend/app/main.py` - Líneas 725-786 (endpoint POST /dm/send)
+
+**Esquema del documento:**
 ```javascript
 {
   "_id": ObjectId("..."),
@@ -73,20 +94,26 @@ Almacena mensajes directos entre usuarios.
 }
 ```
 
-**Índices importantes:**
+**Decisión de diseño:**
+El campo conversation_key es crítico: normaliza la conversación entre dos usuarios ordenando sus usernames alfabéticamente. Esto permite que "rodrigo::kam" y "kam::rodrigo" se traten como la misma conversación. Sin este campo, necesitaríamos consultas con OR doble, que son menos eficientes.
+
+**Índices recomendados:**
 ```javascript
-// Índice en conversation_key para búsquedas rápidas
+// Índice en conversation_key para búsquedas O(log n)
 db.dms.createIndex({ "conversation_key": 1 })
 
 // Índice compuesto para mensajes no leídos
 db.dms.createIndex({ "receiver_username": 1, "read": 1 })
 ```
 
-**¿Por qué MongoDB?**
-- ✅ Flexible schema para posts con diferentes tipos de contenido
-- ✅ Consultas complejas (filtros, agregaciones)
-- ✅ Escalabilidad horizontal con sharding
-- ✅ Perfecto para datos con estructura variable
+**Implementación:** `/app/backend/app/main.py` - Líneas 745-747
+```python
+u1, u2 = sorted([dm.sender_username, dm.receiver_username])
+conversation_key = f"{u1}::{u2}"
+```
+
+**Texto para presentación:**
+"Los mensajes directos están en MongoDB porque necesitamos ordenación cronológica y consultas por conversation_key. Este patrón de normalización es importante: en lugar de hacer una consulta con OR para encontrar mensajes donde 'yo soy sender O receiver', creamos una clave única por conversación. Esto reduce la complejidad de O(n) a O(log n) con un índice apropiado."
 
 ---
 
@@ -99,68 +126,156 @@ db.dms.createIndex({ "receiver_username": 1, "read": 1 })
 
 #### Estructuras de Datos Utilizadas:
 
-##### 🔢 Contadores de Likes (String)
+##### Contadores de Likes (String)
+
+**Implementación:** `/app/backend/app/main.py` - Líneas 1034-1047 (endpoint POST /posts/{post_id}/like)
+
+**Estructura:**
 ```
 Key: "post:{post_id}:likes:count"
 Value: "25"
-Tipo: String (counter)
-
-Comandos:
-INCR post:abc123:likes:count    → Incrementa likes
-GET post:abc123:likes:count     → Obtiene total
-DECR post:abc123:likes:count    → Decrementa likes
+Tipo: String (usado como counter atómico)
 ```
 
-##### 👥 Set de Usuarios que dieron Like (Set)
+**Comandos implementados:**
+```python
+# Línea 1045
+pipe.incr(likes_count_key)    # Incrementa likes atómicamente
+# Línea 1098
+pipe.decr(likes_count_key)    # Decrementa likes (unlike)
+```
+
+**Decisión de diseño:**
+Se eligió String porque Redis permite operaciones atómicas INCR/DECR sobre strings numéricos. Esto es crítico en una red social: múltiples usuarios pueden dar like simultáneamente sin race conditions. Redis garantiza atomicidad sin necesidad de locks, a diferencia de MongoDB donde necesitaríamos transacciones.
+
+**Por qué no MongoDB para likes:**
+MongoDB requeriría un update con $inc por cada like, lo cual toma ~10-50ms. Redis lo hace en <1ms. En una aplicación con millones de likes por día, esta diferencia es significativa en términos de escalabilidad y experiencia de usuario.
+
+**Texto para presentación:**
+"Los contadores de likes usan el tipo String de Redis con operaciones INCR atómicas. Elegimos Redis por tres razones: primero, latencia submilisegundo versus decenas de milisegundos en MongoDB; segundo, operaciones atómicas nativas sin necesidad de transacciones; tercero, la naturaleza volátil está bien aquí porque los contadores se pueden reconstruir desde MongoDB si es necesario. El comando INCR es O(1) y thread-safe."
+
+##### Set de Usuarios que dieron Like (Set)
+
+**Implementación:** `/app/backend/app/main.py` - Líneas 1034-1110
+
+**Estructura:**
 ```
 Key: "post:{post_id}:likes:users"
 Value: {"rodrigo", "kam", "alice"}
-Tipo: Set
-
-Comandos:
-SADD post:abc123:likes:users "rodrigo"     → Agrega like
-SREM post:abc123:likes:users "rodrigo"     → Quita like
-SISMEMBER post:abc123:likes:users "rodrigo" → Verifica si dio like
-SCARD post:abc123:likes:users              → Cuenta total
+Tipo: Set (colección no ordenada sin duplicados)
 ```
 
-##### 📈 Trending Posts (Sorted Set)
+**Comandos implementados:**
+```python
+# Línea 1041 - Verificar si ya dio like
+redis_client.sismember(likes_users_key, username)
+
+# Línea 1046 - Agregar like
+pipe.sadd(likes_users_key, username)
+
+# Línea 1099 - Quitar like
+pipe.srem(likes_users_key, username)
+```
+
+**Por qué Set y no List:**
+Un Set garantiza unicidad automáticamente: un usuario no puede dar like dos veces al mismo post. Con List necesitaríamos verificar manualmente la existencia antes de agregar, lo cual requeriría dos operaciones. SISMEMBER verifica existencia en O(1) gracias al hash table interno de Redis.
+
+**Por qué Set y no Hash:**
+Aunque Hash también evita duplicados, Set es más apropiado cuando solo necesitamos almacenar usernames sin valores asociados. SADD en Set es más simple y eficiente que HSET en Hash para este caso de uso.
+
+**Texto para presentación:**
+"Usamos el tipo Set de Redis para almacenar qué usuarios dieron like porque los Sets garantizan unicidad automáticamente. La operación SISMEMBER verifica si un usuario ya dio like en O(1) usando una tabla hash interna. Esto es crucial antes de incrementar el contador: primero verificamos con SISMEMBER, y solo si retorna false, ejecutamos SADD e INCR en un pipeline atómico. El pipeline asegura que las dos operaciones se ejecuten como una transacción."
+
+##### Trending Posts (Sorted Set)
+
+**Implementación:** `/app/backend/app/main.py` - Líneas 1047 y 1181-1234
+
+**Estructura:**
 ```
 Key: "trending:posts"
 Value: {post_id: score}
-Tipo: Sorted Set (ZSET)
+Tipo: Sorted Set (ZSET) - Set ordenado por score
+```
 
-Estructura:
+**Estructura interna:**
+```
 "trending:posts" → {
   "post_abc123": 45,    // 45 likes
   "post_def456": 32,
   "post_ghi789": 18
 }
-
-Comandos:
-ZINCRBY trending:posts 1 "post_abc123"          → Incrementa score
-ZREVRANGE trending:posts 0 9 WITHSCORES         → Top 10 posts
-ZRANK trending:posts "post_abc123"              → Posición en ranking
 ```
 
-##### 💾 Caché de Feeds (Hash/String con TTL)
+**Comandos implementados:**
+```python
+# Línea 1047 - Incrementar score cuando hay like
+pipe.zincrby("trending:posts", 1, post_id)
+
+# Línea 1100 - Decrementar score cuando hay unlike
+pipe.zincrby("trending:posts", -1, post_id)
+
+# Línea 1187 - Obtener top 10 trending
+trending = redis_client.zrevrange("trending:posts", 0, limit - 1, withscores=True)
+```
+
+**Por qué Sorted Set y no List ordenada:**
+Sorted Set mantiene orden automático por score. Si usáramos List, necesitaríamos extraerla, reordenarla y guardarla de nuevo cada vez que hay un like, lo cual es O(n log n). Con ZINCRBY, actualizar el score es O(log n) y mantiene el orden automáticamente gracias a su implementación con skip list.
+
+**Por qué Sorted Set y no múltiples Strings:**
+Podríamos usar múltiples strings "post:{id}:score" pero entonces obtener el top 10 requeriría consultar todos los posts. Sorted Set permite ZREVRANGE que retorna los top N en O(log n + N), mucho más eficiente.
+
+**Texto para presentación:**
+"El trending usa Sorted Set, una estructura única de Redis que combina un Set con un ranking. Internamente usa una skip list que mantiene los elementos ordenados por score. Cada like ejecuta ZINCRBY que incrementa el score en O(log n) y reposiciona el post automáticamente. Para obtener los top 10, usamos ZREVRANGE que es O(log n + 10), independiente del total de posts. Esto es dramáticamente más eficiente que mantener el ranking en MongoDB, donde necesitaríamos un sort completo de O(n log n) cada vez."
+
+##### Caché de Feeds (String con TTL)
+
+**Implementación:** `/app/backend/app/main.py` - Líneas 578-633
+
+**Estructura:**
 ```
 Key: "feed:{username}:{mode}:{limit}"
-Value: JSON serializado con posts
-TTL: 60 segundos
-
-Comandos:
-SETEX feed:rodrigo:all:20 60 "[{...posts...}]"  → Cachea con expiración
-GET feed:rodrigo:all:20                          → Obtiene del cache
-DEL feed:rodrigo:*                               → Invalida cache
+Value: JSON serializado con lista de posts
+TTL: 60 segundos (expiración automática)
 ```
 
-**¿Por qué Redis?**
-- ⚡ Latencia ultra-baja (<1ms)
-- ✅ Perfecto para likes en tiempo real
-- ✅ Trending posts con Sorted Sets
-- ✅ Caché para reducir carga en MongoDB
-- ✅ Expiración automática de datos (TTL)
+**Comandos implementados:**
+```python
+# Línea 584 - Intentar leer del cache
+cache_key = f"feed:{username}:{mode.value}:{limit}"
+cached = r.get(cache_key)
+
+# Línea 627 - Guardar en cache con TTL de 60 segundos
+r.setex(cache_key, 60, json.dumps([p.dict() for p in posts]))
+
+# Línea 330 - Invalidar cache después de follow/unfollow
+pattern = f"feed:{username}:*"
+for key in r.scan_iter(match=pattern):
+    keys_to_delete.append(key)
+r.delete(*keys_to_delete)
+```
+
+**Por qué String con JSON y no Hash:**
+Redis Hash permitiría almacenar cada campo del post por separado, pero acceder al feed completo requeriría HGETALL y reconstruir los objetos. String con JSON serializado permite obtener todo el feed en una sola operación GET, reduciendo la latencia y el tráfico de red.
+
+**Patrón Cache-Aside implementado:**
+```python
+# 1. Intenta cache (línea 584)
+cached = r.get(cache_key)
+if cached:
+    return json.loads(cached)  # Hit: 1ms
+
+# 2. Miss: consulta MongoDB + Neo4j (línea 600-623)
+posts = query_database()
+
+# 3. Actualiza cache (línea 627)
+r.setex(cache_key, 60, json.dumps(posts))
+```
+
+**TTL de 60 segundos:**
+El tiempo de expiración balancea frescura de datos vs hits de cache. Posts antiguos en el cache son aceptables por 60 segundos. Después, se recarga desde MongoDB para incluir nuevos posts. Eventos que requieren frescura inmediata (follow/unfollow/crear post) invalidan el cache manualmente con DEL.
+
+**Texto para presentación:**
+"El feed usa el patrón Cache-Aside con Redis. La clave incluye username, modo y limit para que cada variante tenga su propio cache. Primero intentamos GET en Redis que toma 1ms. Si hay miss, consultamos MongoDB y Neo4j, lo cual toma unos 50ms, y guardamos el resultado con SETEX que establece el valor y el TTL en una sola operación atómica. El TTL de 60 segundos significa que el cache expira automáticamente, sin necesidad de limpiezas manuales. Cuando un usuario hace follow o crea un post, invalidamos su cache con scan_iter y delete para forzar una recarga con datos frescos."
 
 ---
 
