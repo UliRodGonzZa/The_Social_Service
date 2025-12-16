@@ -86,7 +86,6 @@ const ObservabilityPage = () => {
                 data-testid="tab-data-distribution"
               >
                 🗺️ Data Distribution
-                <span className="ml-2 text-xs text-text-secondary">(Sprint 3)</span>
               </button>
             </div>
           </div>
