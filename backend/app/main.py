@@ -1064,6 +1064,16 @@ class LikeResponse(BaseModel):
     likes_count: int
     user_liked: bool
 
+
+class UserLike(BaseModel):
+    username: str
+    name: Optional[str] = None
+
+class PostLikesDetail(BaseModel):
+    post_id: str
+    likes_count: int
+    users: List[UserLike]
+
 @app.post("/posts/{post_id}/like", response_model=LikeResponse)
 def like_post(post_id: str, username: str):
     """
