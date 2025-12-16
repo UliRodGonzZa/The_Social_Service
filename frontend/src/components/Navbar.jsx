@@ -13,6 +13,7 @@ import {
   FiMessageSquare,
   FiLogOut,
   FiTrendingUp,
+  FiActivity,
 } from "react-icons/fi";
 import { logout } from "../features/auth/authSlice";
 
@@ -71,6 +72,12 @@ const Navbar = () => {
           text="Mensajes"
           to="/messages"
           testId="nav-messages"
+        />
+        <NavItem
+          icon={<FiActivity />}
+          text="Observability"
+          to="/observability"
+          testId="nav-observability"
         />
         <NavItem
           icon={<FiUser />}

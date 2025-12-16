@@ -18,6 +18,15 @@ from enum import Enum
 from app.mongo import get_mongo_db
 
 
+# Importar router de observability (opcional, puede no existir en local)
+try:
+    from app.observability import router as observability_router
+    OBSERVABILITY_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ Módulo de observability no disponible: {e}")
+    observability_router = None
+    OBSERVABILITY_AVAILABLE = False
+
 load_dotenv()
 
 app = FastAPI(title="Red K - API")
@@ -30,6 +39,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Registrar router de observability (ya tiene su propio prefix)
+if OBSERVABILITY_AVAILABLE and observability_router is not None:
+    app.include_router(observability_router)
+    print("✅ Router de observability registrado")
+else:
+    print("⚠️ Router de observability no disponible - continuando sin él")
 
 # --------- Config común ---------
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017/red_k")

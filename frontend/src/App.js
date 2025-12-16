@@ -14,6 +14,7 @@ import TrendingPage from './pages/TrendingPage';
 import DiscoverPage from './pages/DiscoverPage';
 import ProfilePage from './pages/ProfilePage';
 import MessagesPage from './pages/MessagesPage';
+import ObservabilityPage from './pages/ObservabilityPage';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -102,6 +103,15 @@ function App() {
           element={
             <ProtectedRoute>
               <MessagesPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/observability" 
+          element={
+            <ProtectedRoute>
+              <ObservabilityPage />
             </ProtectedRoute>
           } 
         />
