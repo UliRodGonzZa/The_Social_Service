@@ -26,10 +26,12 @@ router = APIRouter(prefix="/observability", tags=["observability"])
 OBSERVABILITY_MODE = os.getenv("OBSERVABILITY_MODE", "mock").lower()  # "production" o "mock"
 
 # Configuración del cluster (para modo production)
+# Usa localhost cuando corres el cluster localmente con docker-compose-cluster.yml
+# Usa redis-master-X cuando corres dentro de Docker network
 REDIS_CLUSTER_NODES = [
-    {"host": "redis-master-1", "port": 7000},
-    {"host": "redis-master-2", "port": 7001},
-    {"host": "redis-master-3", "port": 7002},
+    {"host": os.getenv("REDIS_CLUSTER_HOST_1", "localhost"), "port": 7000},
+    {"host": os.getenv("REDIS_CLUSTER_HOST_2", "localhost"), "port": 7001},
+    {"host": os.getenv("REDIS_CLUSTER_HOST_3", "localhost"), "port": 7002},
 ]
 
 
