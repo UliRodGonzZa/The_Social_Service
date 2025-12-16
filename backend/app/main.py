@@ -1272,7 +1272,7 @@ def get_trending_posts(limit: int = 10):
 
 # ========== ENDPOINTS DE ADMINISTRADOR ==========
 
-@app.get("/api/admin/stats/summary", response_model=AdminSummary)
+@app.get("/admin/stats/summary", response_model=AdminSummary)
 def admin_stats_summary():
     """
     Resumen general de estadísticas de la aplicación
@@ -1310,7 +1310,7 @@ def admin_stats_summary():
         dms_last_7d=dms_last_7d,
     )
 
-@app.get("/api/admin/stats/users/top-posters", response_model=List[TopPoster])
+@app.get("/admin/stats/users/top-posters", response_model=List[TopPoster])
 def admin_top_posters(limit: int = 10):
     """
     Top usuarios con más posts
@@ -1332,7 +1332,7 @@ def admin_top_posters(limit: int = 10):
     ]
 
 
-@app.get("/api/admin/stats/posts/by-day", response_model=List[PostsByDay])
+@app.get("/admin/stats/posts/by-day", response_model=List[PostsByDay])
 def admin_posts_by_day(days: int = 7):
     """
     Posts agrupados por día
@@ -1341,7 +1341,7 @@ def admin_posts_by_day(days: int = 7):
     posts_col = db["posts"]
 
     now = datetime.utcnow()
-    start_date_str = (now - timedelta(days=days)).isoformat()
+    start_date_str = (now - timedelta(days=7)).isoformat()
 
     # Obtener todos los posts en el rango
     posts = list(posts_col.find({"created_at": {"$gte": start_date_str}}))
@@ -1360,7 +1360,7 @@ def admin_posts_by_day(days: int = 7):
     
     return result
 
-@app.get("/api/admin/stats/dms/summary", response_model=DMStatsSummary)
+@app.get("/admin/stats/dms/summary", response_model=DMStatsSummary)
 def admin_dm_summary():
     """
     Resumen de estadísticas de mensajes directos
@@ -1381,7 +1381,7 @@ def admin_dm_summary():
         users_with_dms=users_with_dms,
     )
 
-@app.get("/api/admin/stats/users/{username}", response_model=UserAdminStats)
+@app.get("/admin/stats/users/{username}", response_model=UserAdminStats)
 def admin_user_stats(username: str):
     """
     Estadísticas detalladas de un usuario específico
