@@ -1307,10 +1307,6 @@ def get_post_likes_users(post_id: str):
             users=users_data
         )
 
-        likes_count=count,
-        user_liked=user_liked
-    )
-
 @app.get("/trending/posts")
 def get_trending_posts(limit: int = 10):
     """
