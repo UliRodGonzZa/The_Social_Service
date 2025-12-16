@@ -1269,3 +1269,147 @@ def get_trending_posts(limit: int = 10):
         print(f"⚠️ Error getting trending posts: {e}")
         return []
 
+
+# ========== ENDPOINTS DE ADMINISTRADOR ==========
+
+@app.get("/api/admin/stats/summary", response_model=AdminSummary)
+def admin_stats_summary():
+    """
+    Resumen general de estadísticas de la aplicación
+    """
+    db = get_mongo_db()
+    users_col = db["users"]
+    posts_col = db["posts"]
+    dms_col = db["dms"]
+
+    now = datetime.utcnow()
+    last_7d_str = (now - timedelta(days=7)).isoformat()
+
+    total_users = users_col.count_documents({})
+    total_posts = posts_col.count_documents({})
+    total_dms = dms_col.count_documents({})
+
+    # Posts en los últimos 7 días
+    posts_last_7d = posts_col.count_documents({"created_at": {"$gte": last_7d_str}})
+    dms_last_7d = dms_col.count_documents({"created_at": {"$gte": last_7d_str}})
+
+    # Usuarios activos = los que han posteado o enviado/recibido DMs en los últimos 7 días
+    active_post_users = posts_col.distinct("author_username", {"created_at": {"$gte": last_7d_str}})
+    active_dm_senders = dms_col.distinct("sender_username", {"created_at": {"$gte": last_7d_str}})
+    active_dm_receivers = dms_col.distinct("receiver_username", {"created_at": {"$gte": last_7d_str}})
+
+    active_users_set = set(active_post_users) | set(active_dm_senders) | set(active_dm_receivers)
+    active_users_last_7d = len(active_users_set)
+
+    return AdminSummary(
+        total_users=total_users,
+        total_posts=total_posts,
+        total_dms=total_dms,
+        active_users_last_7d=active_users_last_7d,
+        posts_last_7d=posts_last_7d,
+        dms_last_7d=dms_last_7d,
+    )
+
+@app.get("/api/admin/stats/users/top-posters", response_model=List[TopPoster])
+def admin_top_posters(limit: int = 10):
+    """
+    Top usuarios con más posts
+    """
+    db = get_mongo_db()
+    posts_col = db["posts"]
+
+    pipeline = [
+        {"$group": {"_id": "$author_username", "posts_count": {"$sum": 1}}},
+        {"$sort": {"posts_count": -1}},
+        {"$limit": limit},
+    ]
+
+    results = list(posts_col.aggregate(pipeline))
+
+    return [
+        TopPoster(username=doc["_id"], posts_count=doc["posts_count"])
+        for doc in results
+    ]
+
+
+@app.get("/api/admin/stats/posts/by-day", response_model=List[PostsByDay])
+def admin_posts_by_day(days: int = 7):
+    """
+    Posts agrupados por día
+    """
+    db = get_mongo_db()
+    posts_col = db["posts"]
+
+    now = datetime.utcnow()
+    start_date_str = (now - timedelta(days=days)).isoformat()
+
+    # Obtener todos los posts en el rango
+    posts = list(posts_col.find({"created_at": {"$gte": start_date_str}}))
+
+    # Agrupar por día manualmente
+    posts_by_date = {}
+    for post in posts:
+        created_at = post.get("created_at", "")
+        if created_at:
+            # Extraer solo la fecha (YYYY-MM-DD)
+            date_str = created_at.split("T")[0] if "T" in created_at else created_at[:10]
+            posts_by_date[date_str] = posts_by_date.get(date_str, 0) + 1
+
+    # Convertir a lista ordenada
+    result = [PostsByDay(date=date, count=count) for date, count in sorted(posts_by_date.items())]
+    
+    return result
+
+@app.get("/api/admin/stats/dms/summary", response_model=DMStatsSummary)
+def admin_dm_summary():
+    """
+    Resumen de estadísticas de mensajes directos
+    """
+    db = get_mongo_db()
+    dms_col = db["dms"]
+
+    total_dms = dms_col.count_documents({})
+    unread_dms = dms_col.count_documents({"read": False})
+
+    users_senders = dms_col.distinct("sender_username")
+    users_receivers = dms_col.distinct("receiver_username")
+    users_with_dms = len(set(users_senders) | set(users_receivers))
+
+    return DMStatsSummary(
+        total_dms=total_dms,
+        unread_dms=unread_dms,
+        users_with_dms=users_with_dms,
+    )
+
+@app.get("/api/admin/stats/users/{username}", response_model=UserAdminStats)
+def admin_user_stats(username: str):
+    """
+    Estadísticas detalladas de un usuario específico
+    """
+    db = get_mongo_db()
+    users_col = db["users"]
+    posts_col = db["posts"]
+    dms_col = db["dms"]
+
+    user_doc = users_col.find_one({"username": username})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    posts_count = posts_col.count_documents({"author_username": username})
+    dms_sent_count = dms_col.count_documents({"sender_username": username})
+    dms_received_count = dms_col.count_documents({"receiver_username": username})
+    dms_unread_received = dms_col.count_documents(
+        {"receiver_username": username, "read": False}
+    )
+
+    return UserAdminStats(
+        username=user_doc.get("username"),
+        email=user_doc.get("email"),
+        name=user_doc.get("name"),
+        bio=user_doc.get("bio"),
+        posts_count=posts_count,
+        dms_sent_count=dms_sent_count,
+        dms_received_count=dms_received_count,
+        dms_unread_received=dms_unread_received,
+    )
+
