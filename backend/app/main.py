@@ -15,6 +15,9 @@ from datetime import datetime
 import json
 from enum import Enum
 
+from app.mongo import get_mongo_db
+
+
 load_dotenv()
 
 app = FastAPI(title="Red K - API")
@@ -103,6 +106,37 @@ class DMConversationSummary(BaseModel):
     last_message_at: str  # ISO
     unread_count: int
 
+class AdminSummary(BaseModel):
+    total_users: int
+    total_posts: int
+    total_dms: int
+    active_users_last_7d: int
+    posts_last_7d: int
+    dms_last_7d: int
+
+class TopPoster(BaseModel):
+    username: str
+    posts_count: int
+
+class PostsByDay(BaseModel):
+    date: str  # "YYYY-MM-DD"
+    count: int
+
+class DMStatsSummary(BaseModel):
+    total_dms: int
+    unread_dms: int
+    users_with_dms: int
+
+class UserAdminStats(BaseModel):
+    username: str
+    email: Optional[str]
+    name: Optional[str]
+    bio: Optional[str]
+
+    posts_count: int
+    dms_sent_count: int
+    dms_received_count: int
+    dms_unread_received: int
 # --------- Helpers de DB (simples, por-request) ---------
 
 def get_mongo_db():
@@ -122,7 +156,7 @@ def get_neo4j_driver():
 
 @app.get("/")
 def root():
-    return {"message": "Red K API corriendo dentro de Docker 🐳"}
+    return {"message": "The Social Service corriendo dentro de Docker"}
 
 
 @app.get("/health")
@@ -311,8 +345,7 @@ def follow_user(username: str, target_username: str):
     user_id = str(user_doc["_id"])
     target_id = str(target_doc["_id"])
 
-    # Crear relación en Neo4j (o MongoDB como fallback)
-    neo4j_success = False
+    # Crear relación en Neo4j
     try:
         driver = get_neo4j_driver()
         with driver.session() as session:
@@ -330,15 +363,10 @@ def follow_user(username: str, target_username: str):
                 target_username=target_username,
             )
         driver.close()
-        neo4j_success = True
     except Exception as e:
-        print(f"⚠️ Neo4j no disponible para follow, usando MongoDB: {e}")
-        # Fallback: guardar en MongoDB
-        follows_col = db["follows"]
-        follows_col.update_one(
-            {"follower": username, "following": target_username},
-            {"$set": {"follower": username, "following": target_username}},
-            upsert=True
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al crear relación FOLLOWS en Neo4j: {e}",
         )
 
     # Invalidar caché del feed del usuario (después de follow, su feed cambia)
@@ -383,8 +411,7 @@ def unfollow_user(username: str, target_username: str):
     user_id = str(user_doc["_id"])
     target_id = str(target_doc["_id"])
 
-    # Eliminar relación en Neo4j (o MongoDB como fallback)
-    deleted = False
+    # Eliminar relación en Neo4j
     try:
         driver = get_neo4j_driver()
         with driver.session() as session:
@@ -405,22 +432,15 @@ def unfollow_user(username: str, target_username: str):
                     status_code=404, 
                     detail=f"{username} no sigue a {target_username}"
                 )
-            deleted = True
         
         driver.close()
     except HTTPException:
         raise
     except Exception as e:
-        print(f"⚠️ Neo4j no disponible para unfollow, usando MongoDB: {e}")
-        # Fallback: eliminar de MongoDB
-        follows_col = db["follows"]
-        result = follows_col.delete_one({"follower": username, "following": target_username})
-        if result.deleted_count == 0:
-            raise HTTPException(
-                status_code=404,
-                detail=f"{username} no sigue a {target_username}"
-            )
-        deleted = True
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al eliminar relación FOLLOWS en Neo4j: {e}",
+        )
 
     # Invalidar caché del feed del usuario (después de unfollow, su feed cambia)
     try:
@@ -462,7 +482,6 @@ def list_following(username: str):
 
     user_id = str(user_doc["_id"])
 
-    following = []
     try:
         driver = get_neo4j_driver()
         with driver.session() as session:
@@ -487,23 +506,10 @@ def list_following(username: str):
             ]
         driver.close()
     except Exception as e:
-        print(f"⚠️ Neo4j no disponible para following, usando MongoDB: {e}")
-        # Fallback: leer de MongoDB
-        follows_col = db["follows"]
-        for doc in follows_col.find({"follower": username}):
-            following_username = doc.get("following")
-            if following_username:
-                # Obtener datos del usuario desde MongoDB
-                following_user = users_col.find_one({"username": following_username})
-                if following_user:
-                    following.append(
-                        FollowingOut(
-                            username=following_user.get("username"),
-                            name=following_user.get("name"),
-                            bio=following_user.get("bio"),
-                            email=following_user.get("email"),
-                        )
-                    )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al consultar Neo4j: {e}",
+        )
 
     return following
 
@@ -617,17 +623,13 @@ def get_user_feed(
 
     # Intentar leer de cache
     if r is not None:
-        try:
-            cached = r.get(cache_key)
-            if cached:
-                try:
-                    data = json.loads(cached)
-                    return data
-                except Exception:
-                    pass  # si falla parseo, seguimos normal
-        except Exception:
-            # Redis no está disponible, continuar sin cache
-            r = None
+        cached = r.get(cache_key)
+        if cached:
+            try:
+                data = json.loads(cached)
+                return data
+            except Exception:
+                pass  # si falla parseo, seguimos normal
 
     # Construir lista de autores según el modo
     authors: List[str] = []
@@ -638,7 +640,7 @@ def get_user_feed(
     followed_usernames: List[str] = []
 
     if mode in (FeedMode.all, FeedMode.following_only):
-        # Obtener a quién sigue desde Neo4j (o MongoDB como fallback)
+        # Obtener a quién sigue desde Neo4j
         try:
             driver = get_neo4j_driver()
             with driver.session() as session:
@@ -654,14 +656,9 @@ def get_user_feed(
                     if uname and uname not in followed_usernames:
                         followed_usernames.append(uname)
             driver.close()
-        except Exception as e:
-            print(f"⚠️ Neo4j no disponible para feed, usando MongoDB: {e}")
-            # Fallback: leer de MongoDB
-            follows_col = db["follows"]
-            for doc in follows_col.find({"follower": username}):
-                uname = doc.get("following")
-                if uname and uname not in followed_usernames:
-                    followed_usernames.append(uname)
+        except Exception:
+            # si Neo4j falla, simplemente no añadimos seguidos
+            pass
 
         authors.extend([u for u in followed_usernames if u not in authors])
 
@@ -690,12 +687,11 @@ def get_user_feed(
             )
         )
 
-    # Intentar guardar en cache (best effort)
     if r is not None:
         try:
             r.setex(cache_key, 60, json.dumps([p.dict() for p in posts]))
-        except Exception as e:
-            print(f"⚠️ No se pudo guardar en cache: {e}")
+        except Exception:
+            pass
 
     return posts
 
@@ -778,9 +774,11 @@ def get_suggestions(username: str, limit: int = 10):
                 )
         driver.close()
     except Exception as e:
-        # si Neo4j falla, usar fallback a MongoDB
-        print(f"⚠️ Neo4j no disponible para suggestions: {e}")
-        pass
+        # si Neo4j falla, error 
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al consultar sugerencias en Neo4j: {e}",
+        )
 
     if not suggestions:
         docs = (
@@ -951,13 +949,17 @@ def list_conversations(username: str):
     - timestamp del último mensaje
     - número de mensajes no leídos
     """
+    print(f"🔍 DEBUG START: list_conversations called for username={username}")
     db = get_mongo_db()
+    print(f"🔍 DEBUG: Database obtained: {db.name}")
     users_col = db["users"]
     dms_col = db["dms"]
 
     user_doc = users_col.find_one({"username": username})
+    print(f"🔍 DEBUG conversations: username={username}, found={user_doc is not None}, user_doc={user_doc}")
     if not user_doc:
-        raise HTTPException(status_code=404, detail=f"Usuario {username} no encontrado en conversations endpoint")
+        print(f"❌ DEBUG: Usuario '{username}' no encontrado en la colección")
+        raise HTTPException(status_code=404, detail=f"Usuario '{username}' no encontrado en MongoDB [DEBUG v2]")
 
     # Traemos todos los mensajes donde participa
     cursor = dms_col.find(
@@ -1026,47 +1028,45 @@ def like_post(post_id: str, username: str):
     Integración NoSQL:
     1. Redis: Incrementar contador + agregar a set de usuarios
     2. Neo4j: Crear relación (User)-[:LIKES]->(Post)
-    3. MongoDB: Actualizar contador (fallback)
+    3. MongoDB: Actualizar contador (eventual)
     """
-    db = get_mongo_db()
-    likes_col = db["likes"]
+    redis_client = get_redis_client()
     
-    # Verificar si ya dio like (primero en MongoDB)
-    existing_like = likes_col.find_one({"post_id": post_id, "username": username})
-    if existing_like:
+    # Key para el contador de likes
+    likes_count_key = f"post:{post_id}:likes:count"
+    # Key para el set de usuarios que dieron like
+    likes_users_key = f"post:{post_id}:likes:users"
+    
+    # Verificar si ya dio like
+    if redis_client.sismember(likes_users_key, username):
         # Ya dio like, contar y retornar
-        count = likes_col.count_documents({"post_id": post_id})
+        count = redis_client.get(likes_count_key)
         return LikeResponse(
             post_id=post_id,
-            likes_count=count,
+            likes_count=int(count) if count else 0,
             user_liked=True
         )
     
-    # Guardar like en MongoDB
-    likes_col.insert_one({"post_id": post_id, "username": username})
-    new_count = likes_col.count_documents({"post_id": post_id})
+    # Pipeline atómico
+    pipe = redis_client.pipeline()
+    pipe.incr(likes_count_key)  # Incrementar contador
+    pipe.sadd(likes_users_key, username)  # Agregar usuario al set
+    pipe.zincrby("trending:posts", 1, post_id)  # Agregar al trending
+    results = pipe.execute()
     
-    # Intentar con Redis (opcional)
-    try:
-        redis_client = get_redis_client()
-        likes_count_key = f"post:{post_id}:likes:count"
-        likes_users_key = f"post:{post_id}:likes:users"
-        pipe = redis_client.pipeline()
-        pipe.set(likes_count_key, new_count)
-        pipe.sadd(likes_users_key, username)
-        pipe.zincrby("trending:posts", 1, post_id)
-        pipe.execute()
-    except Exception as e:
-        print(f"⚠️ Redis no disponible para likes: {e}")
+    new_count = results[0]
     
-    # Crear relación en Neo4j (opcional)
+    # Crear relación en Neo4j
     try:
         driver = get_neo4j_driver()
         with driver.session() as session:
+            # Obtener user_id desde MongoDB
+            db = get_mongo_db()
             users_col = db["users"]
             user_doc = users_col.find_one({"username": username})
             if user_doc:
                 user_id = str(user_doc["_id"])
+                
                 session.run(
                     """
                     MERGE (u:User {id: $user_id})
@@ -1078,7 +1078,7 @@ def like_post(post_id: str, username: str):
                 )
         driver.close()
     except Exception as e:
-        print(f"⚠️ Neo4j no disponible para likes: {e}")
+        print(f"Warning: Error creating LIKES relationship in Neo4j: {e}")
     
     return LikeResponse(
         post_id=post_id,
@@ -1091,45 +1091,40 @@ def unlike_post(post_id: str, username: str):
     """
     Quitar like de un post
     """
-    db = get_mongo_db()
-    likes_col = db["likes"]
+    redis_client = get_redis_client()
+    
+    likes_count_key = f"post:{post_id}:likes:count"
+    likes_users_key = f"post:{post_id}:likes:users"
     
     # Verificar si había dado like
-    existing_like = likes_col.find_one({"post_id": post_id, "username": username})
-    if not existing_like:
+    if not redis_client.sismember(likes_users_key, username):
         # No había dado like
-        count = likes_col.count_documents({"post_id": post_id})
+        count = redis_client.get(likes_count_key)
         return LikeResponse(
             post_id=post_id,
-            likes_count=count,
+            likes_count=int(count) if count else 0,
             user_liked=False
         )
     
-    # Eliminar like de MongoDB
-    likes_col.delete_one({"post_id": post_id, "username": username})
-    new_count = likes_col.count_documents({"post_id": post_id})
+    # Pipeline atómico
+    pipe = redis_client.pipeline()
+    pipe.decr(likes_count_key)
+    pipe.srem(likes_users_key, username)
+    pipe.zincrby("trending:posts", -1, post_id)
+    results = pipe.execute()
     
-    # Intentar con Redis (opcional)
-    try:
-        redis_client = get_redis_client()
-        likes_count_key = f"post:{post_id}:likes:count"
-        likes_users_key = f"post:{post_id}:likes:users"
-        pipe = redis_client.pipeline()
-        pipe.set(likes_count_key, new_count)
-        pipe.srem(likes_users_key, username)
-        pipe.zincrby("trending:posts", -1, post_id)
-        pipe.execute()
-    except Exception as e:
-        print(f"⚠️ Redis no disponible para unlike: {e}")
+    new_count = max(0, results[0])  # No permitir negativos
     
-    # Eliminar relación en Neo4j (opcional)
+    # Eliminar relación en Neo4j
     try:
         driver = get_neo4j_driver()
         with driver.session() as session:
+            db = get_mongo_db()
             users_col = db["users"]
             user_doc = users_col.find_one({"username": username})
             if user_doc:
                 user_id = str(user_doc["_id"])
+                
                 session.run(
                     """
                     MATCH (u:User {id: $user_id})-[r:LIKES]->(p:Post {id: $post_id})
@@ -1140,7 +1135,7 @@ def unlike_post(post_id: str, username: str):
                 )
         driver.close()
     except Exception as e:
-        print(f"⚠️ Neo4j no disponible para unlike: {e}")
+        print(f"Warning: Error deleting LIKES relationship in Neo4j: {e}")
     
     return LikeResponse(
         post_id=post_id,
@@ -1153,19 +1148,20 @@ def get_post_likes(post_id: str, username: str = None):
     """
     Obtener información de likes de un post
     """
-    db = get_mongo_db()
-    likes_col = db["likes"]
+    redis_client = get_redis_client()
     
-    # Contar likes desde MongoDB
-    count = likes_col.count_documents({"post_id": post_id})
+    likes_count_key = f"post:{post_id}:likes:count"
+    likes_users_key = f"post:{post_id}:likes:users"
+    
+    count = redis_client.get(likes_count_key)
     user_liked = False
     
     if username:
-        user_liked = likes_col.find_one({"post_id": post_id, "username": username}) is not None
+        user_liked = redis_client.sismember(likes_users_key, username)
     
     return LikeResponse(
         post_id=post_id,
-        likes_count=count,
+        likes_count=int(count) if count else 0,
         user_liked=user_liked
     )
 
@@ -1174,48 +1170,166 @@ def get_trending_posts(limit: int = 10):
     """
     Obtener posts trending (más likeados)
     
-    Usa MongoDB como fuente principal, agregando likes por post
+    Redis: ZREVRANGE trending:posts 0 9 WITHSCORES
     """
-    try:
-        db = get_mongo_db()
-        posts_col = db["posts"]
-        likes_col = db["likes"]
-        
-        # Agregación para contar likes por post
-        pipeline = [
-            {"$group": {"_id": "$post_id", "likes_count": {"$sum": 1}}},
-            {"$sort": {"likes_count": -1}},
-            {"$limit": limit}
-        ]
-        
-        trending_data = list(likes_col.aggregate(pipeline))
-        
-        if not trending_data:
-            return []
-        
-        result = []
-        for item in trending_data:
-            post_id = item["_id"]
-            likes_count = item["likes_count"]
-            
-            # Buscar post en MongoDB
-            try:
-                post_doc = posts_col.find_one({"_id": ObjectId(post_id)})
-                if post_doc:
-                    result.append({
-                        "id": str(post_doc["_id"]),
-                        "author_username": post_doc.get("author_username"),
-                        "content": post_doc.get("content"),
-                        "tags": post_doc.get("tags", []),
-                        "created_at": post_doc.get("created_at"),
-                        "likes_count": likes_count
-                    })
-            except Exception as e:
-                print(f"Error getting post {post_id}: {e}")
-                continue
-        
-        return result
-    except Exception as e:
-        print(f"⚠️ Error getting trending posts: {e}")
+    redis_client = get_redis_client()
+    
+    # Obtener top posts del sorted set
+    trending = redis_client.zrevrange("trending:posts", 0, limit - 1, withscores=True)
+    
+    if not trending:
         return []
+    
+    # Obtener detalles de los posts desde MongoDB
+    db = get_mongo_db()
+    posts_col = db["posts"]
+    
+    result = []
+    for post_id, score in trending:
+        # Convertir bytes a string si es necesario
+        if isinstance(post_id, bytes):
+            post_id = post_id.decode('utf-8')
+        
+        # Buscar post en MongoDB
+        try:
+            post_doc = posts_col.find_one({"_id": ObjectId(post_id)})
+            if post_doc:
+                result.append({
+                    "id": str(post_doc["_id"]),
+                    "author_username": post_doc.get("author_username"),
+                    "content": post_doc.get("content"),
+                    "tags": post_doc.get("tags", []),
+                    "created_at": post_doc.get("created_at"),
+                    "likes_count": int(score)
+                })
+        except Exception as e:
+            print(f"Error getting post {post_id}: {e}")
+            continue
+    
+    return result
 
+
+@app.get("/admin/stats/summary", response_model=AdminSummary)
+def admin_stats_summary():
+    db = get_mongo_db()
+    users_col = db["users"]
+    posts_col = db["posts"]
+    dms_col = db["dms"]
+
+    now = datetime.utcnow()
+    last_7d = now - timedelta(days=7)
+
+    total_users = users_col.count_documents({})
+    total_posts = posts_col.count_documents({})
+    total_dms = dms_col.count_documents({})
+
+    posts_last_7d = posts_col.count_documents({"created_at": {"$gte": last_7d}})
+    dms_last_7d = dms_col.count_documents({"created_at": {"$gte": last_7d}})
+
+    # usuarios activos = los que han posteado o enviado/recibido DMs en los últimos 7 días
+    active_post_users = posts_col.distinct("author_username", {"created_at": {"$gte": last_7d}})
+    active_dm_senders = dms_col.distinct("sender_username", {"created_at": {"$gte": last_7d}})
+    active_dm_receivers = dms_col.distinct("receiver_username", {"created_at": {"$gte": last_7d}})
+
+    active_users_set = set(active_post_users) | set(active_dm_senders) | set(active_dm_receivers)
+    active_users_last_7d = len(active_users_set)
+
+    return AdminSummary(
+        total_users=total_users,
+        total_posts=total_posts,
+        total_dms=total_dms,
+        active_users_last_7d=active_users_last_7d,
+        posts_last_7d=posts_last_7d,
+        dms_last_7d=dms_last_7d,
+    )
+
+@app.get("/admin/stats/users/top-posters", response_model=List[TopPoster])
+def admin_top_posters(limit: int = 10):
+    db = get_mongo_db()
+    posts_col = db["posts"]
+
+    pipeline = [
+        {"$group": {"_id": "$author_username", "posts_count": {"$sum": 1}}},
+        {"$sort": {"posts_count": -1}},
+        {"$limit": limit},
+    ]
+
+    results = list(posts_col.aggregate(pipeline))
+
+    return [
+        TopPoster(username=doc["_id"], posts_count=doc["posts_count"])
+        for doc in results
+    ]
+
+
+@app.get("/admin/stats/posts/by-day", response_model=List[PostsByDay])
+def admin_posts_by_day(days: int = 7):
+    db = get_mongo_db()
+    posts_col = db["posts"]
+
+    now = datetime.utcnow()
+    start_date = now - timedelta(days=days)
+
+    pipeline = [
+        {"$match": {"created_at": {"$gte": start_date}}},
+        {
+            "$group": {
+                "_id": {
+                    "$dateToString": {"format": "%Y-%m-%d", "date": "$created_at"}
+                },
+                "count": {"$sum": 1},
+            }
+        },
+        {"$sort": {"_id": 1}},
+    ]
+
+    results = list(posts_col.aggregate(pipeline))
+
+    return [PostsByDay(date=doc["_id"], count=doc["count"]) for doc in results]
+
+@app.get("/admin/stats/dms/summary", response_model=DMStatsSummary)
+def admin_dm_summary():
+    db = get_mongo_db()
+    dms_col = db["dms"]
+
+    total_dms = dms_col.count_documents({})
+    unread_dms = dms_col.count_documents({"read": False})
+
+    users_senders = dms_col.distinct("sender_username")
+    users_receivers = dms_col.distinct("receiver_username")
+    users_with_dms = len(set(users_senders) | set(users_receivers))
+
+    return DMStatsSummary(
+        total_dms=total_dms,
+        unread_dms=unread_dms,
+        users_with_dms=users_with_dms,
+    )
+
+@app.get("/admin/stats/users/{username}", response_model=UserAdminStats)
+def admin_user_stats(username: str):
+    db = get_mongo_db()
+    users_col = db["users"]
+    posts_col = db["posts"]
+    dms_col = db["dms"]
+
+    user_doc = users_col.find_one({"username": username})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    posts_count = posts_col.count_documents({"author_username": username})
+    dms_sent_count = dms_col.count_documents({"sender_username": username})
+    dms_received_count = dms_col.count_documents({"receiver_username": username})
+    dms_unread_received = dms_col.count_documents(
+        {"receiver_username": username, "read": False}
+    )
+
+    return UserAdminStats(
+        username=user_doc.get("username"),
+        email=user_doc.get("email"),
+        name=user_doc.get("name"),
+        bio=user_doc.get("bio"),
+        posts_count=posts_count,
+        dms_sent_count=dms_sent_count,
+        dms_received_count=dms_received_count,
+        dms_unread_received=dms_unread_received,
+    )
