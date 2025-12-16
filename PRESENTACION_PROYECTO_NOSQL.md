@@ -471,12 +471,42 @@ ON CREATE SET vs ON MATCH SET actualiza el timestamp solo cuando hay actividad. 
 #### Consultas Principales:
 
 ##### 1. Obtener Usuarios que Sigo
+
+**Implementación:** `/app/backend/app/main.py` - Líneas 411-425
+
 ```cypher
 MATCH (u:User {id: $user_id})-[:FOLLOWS]->(followed:User)
 RETURN followed.username, followed.name, followed.bio
 ```
 
+**Código Python:**
+```python
+# Línea 415-425
+result = session.run(
+    """
+    MATCH (u:User {id: $user_id})-[:FOLLOWS]->(f:User)
+    RETURN f.username AS username,
+           f.name AS name,
+           f.bio AS bio,
+           f.email AS email
+    """,
+    user_id=user_id,
+)
+```
+
+**Complejidad:**
+O(d) donde d es el out-degree del nodo, es decir, el número de usuarios que sigo. Neo4j almacena las relaciones como listas enlazadas desde cada nodo, por lo que recorrer todas las relaciones FOLLOWS salientes es lineal en el número de relaciones.
+
+**Comparación con MongoDB:**
+En MongoDB necesitaríamos un array following en el documento user y luego hacer: db.users.find({username: {$in: user.following}}). Esto requiere una consulta para obtener el array y otra con $in para obtener los detalles. En Neo4j es una sola consulta de traversal.
+
+**Texto para presentación:**
+"Esta consulta usa MATCH con un patrón de relación dirigida. Neo4j encuentra el nodo User por id usando un índice en O(log n), luego recorre todas las relaciones FOLLOWS salientes en O(d) donde d es cuántos usuarios sigo. El resultado incluye propiedades de los nodos destino sin necesidad de joins adicionales. Esto es más eficiente que MongoDB donde el $in con arrays puede degradarse a O(n*m) donde n es usuarios seguidos y m es usuarios totales sin índices apropiados."
+
 ##### 2. Sugerencias de Amigos (Amigos de Amigos)
+
+**Implementación:** `/app/backend/app/main.py` - Líneas 673-720
+
 ```cypher
 // Usuarios a 2 saltos que aún no sigo
 MATCH (u:User {id: $user_id})-[:FOLLOWS]->(:User)-[:FOLLOWS]->(suggested:User)
@@ -502,6 +532,27 @@ RETURN
 ORDER BY score DESC
 LIMIT 10
 ```
+
+**Algoritmo del score:**
+- Conexiones mutuas: peso 3.0 (más importante: indica afinidad)
+- Followers: peso 2.0 (indica popularidad)
+- Posts: peso 1.0 (indica actividad)
+
+**Complejidad:**
+O(d1 * d2) donde d1 es usuarios que sigo y d2 es promedio de usuarios que ellos siguen. En la práctica, con límite de 10 resultados, Neo4j optimiza el traversal para detenerse cuando encuentra suficientes candidatos.
+
+**Por qué Neo4j es superior aquí:**
+Esta query en MongoDB requeriría:
+1. Query para obtener mis follows
+2. Query para obtener follows de cada uno (N queries)
+3. Intersección de conjuntos en código
+4. Queries adicionales para contar followers y posts
+5. Sort en memoria
+
+En Neo4j todo sucede en una sola query optimizada por el motor de grafos.
+
+**Texto para presentación:**
+"Esta es la consulta más compleja del proyecto y demuestra la potencia de Neo4j. Recorremos dos saltos en el grafo: de mí a mis amigos, de mis amigos a sus amigos. El WHERE con NOT excluye a quienes ya sigo. COUNT con AS mutual_connections cuenta cuántos caminos llevan a cada candidato, es decir, cuántos amigos tenemos en común. OPTIONAL MATCH permite contar relaciones sin fallar si no existen. El score compuesto pondera conexiones mutuas tres veces más que followers porque indican mayor afinidad. En una base de datos relacional o documental, esta query requeriría múltiples joins o lookups iterativos. Neo4j la ejecuta en tiempo lineal respecto a la vecindad local del grafo."
 
 ##### 3. Feed Personalizado
 ```cypher
