@@ -10,12 +10,14 @@ import { FiHeart, FiMessageCircle, FiShare2 } from 'react-icons/fi';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { postsAPI } from '../../services/api';
+import LikesModal from '../../components/LikesModal';
 
 const PostCard = ({ post }) => {
   const { currentUser } = useSelector((state) => state.auth);
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
   const [loading, setLoading] = useState(false);
+  const [showLikesModal, setShowLikesModal] = useState(false);
   
   const timeAgo = post.created_at
     ? formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: es })
@@ -115,21 +117,29 @@ const PostCard = ({ post }) => {
             {/* Actions */}
             <div className="mt-3 flex items-center space-x-12 text-text-secondary">
               {/* Likes - FUNCIONAL */}
-              <button
-                onClick={handleLike}
-                disabled={loading}
-                className={`flex items-center space-x-2 transition-colors group ${
-                  liked ? 'text-danger' : 'hover:text-danger'
-                }`}
-                data-testid="post-like-button"
-              >
-                <FiHeart 
-                  className={`w-5 h-5 transition-all ${
-                    liked ? 'fill-danger' : 'group-hover:fill-danger'
+              <div className="flex items-center space-x-1">
+                <button
+                  onClick={handleLike}
+                  disabled={loading}
+                  className={`flex items-center space-x-2 transition-colors group ${
+                    liked ? 'text-danger' : 'hover:text-danger'
                   }`}
-                />
-                <span className="text-sm">{likesCount}</span>
-              </button>
+                  data-testid="post-like-button"
+                >
+                  <FiHeart 
+                    className={`w-5 h-5 transition-all ${
+                      liked ? 'fill-danger' : 'group-hover:fill-danger'
+                    }`}
+                  />
+                </button>
+                <button
+                  onClick={() => setShowLikesModal(true)}
+                  className="text-sm hover:underline px-2"
+                  disabled={likesCount === 0}
+                >
+                  {likesCount}
+                </button>
+              </div>
               
               {/* Comments - TODO: Implementar */}
               <button
@@ -148,6 +158,13 @@ const PostCard = ({ post }) => {
           </div>
         </div>
       </div>
+
+      {/* Modal de Likes */}
+      <LikesModal 
+        postId={post.id}
+        isOpen={showLikesModal}
+        onClose={() => setShowLikesModal(false)}
+      />
     </article>
   );
 };
