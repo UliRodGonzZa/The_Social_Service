@@ -154,11 +154,7 @@ class UserAdminStats(BaseModel):
     dms_unread_received: int
 
 # --------- Helpers de DB (simples, por-request) ---------
-
-def get_mongo_db():
-    client = MongoClient(MONGO_URI)
-    return client.get_database("red_k")  # explicitly specify database name
-
+# Nota: get_mongo_db() se importa desde app.mongo para usar conexión centralizada
 
 def get_redis_client():
     return redis.from_url(REDIS_URL)
