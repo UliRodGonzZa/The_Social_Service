@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Heart } from 'react-icons/fi';
+import { FiX, FiHeart } from 'react-icons/fi';
 
 const LikesModal = ({ postId, isOpen, onClose }) => {
   const [likes, setLikes] = useState([]);
@@ -43,7 +43,7 @@ const LikesModal = ({ postId, isOpen, onClose }) => {
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-dark-border">
           <div className="flex items-center space-x-2">
-            <Heart className="w-5 h-5 text-red-500 fill-current" />
+            <FiHeart className="w-5 h-5 text-red-500 fill-current" />
             <h2 className="text-lg font-semibold text-text-primary">
               Likes
             </h2>
@@ -52,7 +52,7 @@ const LikesModal = ({ postId, isOpen, onClose }) => {
             onClick={onClose}
             className="text-text-secondary hover:text-text-primary transition-colors"
           >
-            <X className="w-6 h-6" />
+            <FiX className="w-6 h-6" />
           </button>
         </div>
 
@@ -74,7 +74,7 @@ const LikesModal = ({ postId, isOpen, onClose }) => {
             </div>
           ) : likes.length === 0 ? (
             <div className="text-center py-8 text-text-secondary">
-              <Heart className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <FiHeart className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p>Aún no hay likes</p>
             </div>
           ) : (
@@ -102,7 +102,7 @@ const LikesModal = ({ postId, isOpen, onClose }) => {
                   </div>
 
                   {/* Like Icon */}
-                  <Heart className="w-5 h-5 text-red-500 fill-current" />
+                  <FiHeart className="w-5 h-5 text-red-500 fill-current" />
                 </div>
               ))}
             </div>
