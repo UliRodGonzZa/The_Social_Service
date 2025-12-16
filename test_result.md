@@ -31,7 +31,7 @@ Basado en la revisión de código, el problema identificado es:
 
 #### 1. **URL de Petición POST Capturada**:
 - **URL Detectada**: `http://localhost:8001/posts/`
-- **URL Esperada**: `https://socialfastapi.preview.emergentagent.com/api/posts/`
+- **URL Esperada**: `https://cluster-metrics.preview.emergentagent.com/api/posts/`
 - **❌ PROBLEMA CONFIRMADO**: La aplicación está usando la URL hardcodeada incorrecta
 
 #### 2. **Payload Enviado**:
@@ -45,7 +45,7 @@ Basado en la revisión de código, el problema identificado es:
 ✅ El payload es correcto y está bien formateado
 
 #### 3. **Errores de Red Capturados**:
-- **Error CORS**: `Access to XMLHttpRequest at 'http://localhost:8001/posts/' from origin 'https://socialfastapi.preview.emergentagent.com' has been blocked by CORS policy`
+- **Error CORS**: `Access to XMLHttpRequest at 'http://localhost:8001/posts/' from origin 'https://cluster-metrics.preview.emergentagent.com' has been blocked by CORS policy`
 - **Tipo de Error**: `Permission was denied for this request to access the 'unknown' address space`
 - **Status**: `net::ERR_FAILED` (la petición nunca llega al servidor)
 
@@ -69,7 +69,7 @@ const API_BASE_URL = 'http://localhost:8001';
 
 **Debe cambiarse a**:
 ```javascript
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'https://socialfastapi.preview.emergentagent.com';
+const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'https://cluster-metrics.preview.emergentagent.com';
 ```
 
 Y todas las rutas del backend deben incluir el prefijo `/api`.
@@ -82,7 +82,7 @@ Y todas las rutas del backend deben incluir el prefijo `/api`.
 **Priority**: P0 - BLOCKER CRÍTICO
 
 **Issue Confirmed**: 
-- La aplicación está haciendo peticiones POST a `http://localhost:8001/posts/` en lugar de `https://socialfastapi.preview.emergentagent.com/api/posts/`
+- La aplicación está haciendo peticiones POST a `http://localhost:8001/posts/` en lugar de `https://cluster-metrics.preview.emergentagent.com/api/posts/`
 - Error CORS bloquea todas las peticiones al backend
 - Usuario ve mensaje "Error al crear el post"
 
@@ -107,7 +107,7 @@ Y todas las rutas del backend deben incluir el prefijo `/api`.
 ### Changes Made:
 1. ✅ Modificado `/app/frontend/src/services/api.js` línea 9:
    - **Antes**: `const API_BASE_URL = 'http://localhost:8001';`
-   - **Después**: `const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'https://socialfastapi.preview.emergentagent.com';`
+   - **Después**: `const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'https://cluster-metrics.preview.emergentagent.com';`
 
 2. ✅ Agregado prefijo `/api` a todas las rutas:
    - authAPI: `/api/users/`, `/api/users/by-username/...`
@@ -119,7 +119,7 @@ Y todas las rutas del backend deben incluir el prefijo `/api`.
 
 ### Status:
 - Frontend service: ✅ RUNNING (pid 763)
-- Expected behavior: Peticiones POST ahora deberían ir a `https://socialfastapi.preview.emergentagent.com/api/posts/`
+- Expected behavior: Peticiones POST ahora deberían ir a `https://cluster-metrics.preview.emergentagent.com/api/posts/`
 
 ### Next Test:
 Verificar que el fix funciona correctamente usando frontend testing agent.
@@ -134,8 +134,8 @@ Verificar que el fix funciona correctamente usando frontend testing agent.
 ### Critical Findings:
 
 #### 1. **✅ URL Fix WORKING**:
-- **URL Captured**: `https://socialfastapi.preview.emergentagent.com/api/posts/`
-- **Expected**: `https://socialfastapi.preview.emergentagent.com/api/posts/`
+- **URL Captured**: `https://cluster-metrics.preview.emergentagent.com/api/posts/`
+- **Expected**: `https://cluster-metrics.preview.emergentagent.com/api/posts/`
 - **✅ PERFECT MATCH**: The fix correctly routes POST requests to the right URL with `/api` prefix
 
 #### 2. **✅ CORS Issue RESOLVED**:
@@ -169,7 +169,7 @@ Couldn't connect to localhost:7687"
 
 | Requirement | Status | Details |
 |-------------|--------|---------|
-| ✅ URL correcta | **PASS** | `https://socialfastapi.preview.emergentagent.com/api/posts/` |
+| ✅ URL correcta | **PASS** | `https://cluster-metrics.preview.emergentagent.com/api/posts/` |
 | ✅ No CORS errors | **PASS** | Zero CORS blocking messages |
 | ✅ Frontend integration | **PASS** | Form works, API calls correct |
 | ❌ Backend response | **FAIL** | 500 error due to Neo4j/Redis infrastructure |
@@ -193,7 +193,7 @@ Couldn't connect to localhost:7687"
 - ❌ **Backend infrastructure**: Neo4j (port 7687) and Redis (port 6379) not running
 
 **Evidence**:
-- ✅ POST URL: `https://socialfastapi.preview.emergentagent.com/api/posts/` (correct)
+- ✅ POST URL: `https://cluster-metrics.preview.emergentagent.com/api/posts/` (correct)
 - ✅ Zero CORS errors in console
 - ✅ Form submission works perfectly
 - ❌ Backend returns 500 due to database connection issues
@@ -246,7 +246,7 @@ Final end-to-end test to verify post creation works completely with all database
 ### Test Results:
 
 #### 1. **✅ POST CREATION - PERFECT SUCCESS**:
-- **URL Verified**: `https://socialfastapi.preview.emergentagent.com/api/posts/`
+- **URL Verified**: `https://cluster-metrics.preview.emergentagent.com/api/posts/`
 - **Method**: POST
 - **Status**: 200 OK
 - **Payload**: `{"author_username":"alice","content":"¡Prueba final exitosa! 🎉 MongoDB + Neo4j + Redis funcionando perfectamente","tags":["test","exito","nosql"]}`
@@ -337,7 +337,7 @@ Final end-to-end test to verify post creation works completely with all database
 - ✅ **User experience**: SEAMLESS AND PROFESSIONAL
 
 **Evidence Captured**:
-- ✅ POST request: `https://socialfastapi.preview.emergentagent.com/api/posts/` (200 OK)
+- ✅ POST request: `https://cluster-metrics.preview.emergentagent.com/api/posts/` (200 OK)
 - ✅ Complete payload verification
 - ✅ Real-time feed updates confirmed
 - ✅ Like functionality verified (0→1 likes)
@@ -775,7 +775,7 @@ The follow functionality works perfectly for all primary use cases:
 #### 1. **❌ ROUTING ISSUE CONFIRMED - CRITICAL BLOCKER**:
 - **Problem**: Navigation to `/profile/bob` redirects back to `/feed`
 - **Impact**: Cannot access other user profiles to test follow functionality
-- **Tested URLs**: Direct navigation to `https://socialfastapi.preview.emergentagent.com/profile/bob`
+- **Tested URLs**: Direct navigation to `https://cluster-metrics.preview.emergentagent.com/profile/bob`
 - **Result**: URL changes but page redirects to feed instead of showing profile
 - **Status**: Same routing issue identified in previous profile testing persists
 

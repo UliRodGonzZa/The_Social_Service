@@ -27,7 +27,7 @@ Cuando el código está en Emergent:
 
 **Archivo: `/frontend/.env`**
 ```env
-REACT_APP_BACKEND_URL=https://socialfastapi.preview.emergentagent.com
+REACT_APP_BACKEND_URL=https://cluster-metrics.preview.emergentagent.com
 ```
 
 **¿Por qué?**
@@ -50,7 +50,7 @@ yarn start
 **Antes de subir a EMERGENT:**
 ```bash
 cd frontend  
-echo "REACT_APP_BACKEND_URL=https://socialfastapi.preview.emergentagent.com" > .env
+echo "REACT_APP_BACKEND_URL=https://cluster-metrics.preview.emergentagent.com" > .env
 # Commit y push
 ```
 
@@ -77,7 +77,7 @@ cp .env.emergent.example .env
 
 Si quieres que funcione en Emergent sin tocar nada:
 - El archivo `api.js` tiene un **fallback automático**
-- Si `.env` no existe o está vacío, usa: `https://socialfastapi.preview.emergentagent.com`
+- Si `.env` no existe o está vacío, usa: `https://cluster-metrics.preview.emergentagent.com`
 
 ---
 
@@ -97,7 +97,7 @@ Si quieres que funcione en Emergent sin tocar nada:
    ```bash
    # Cambiar el .env
    cd /app/frontend
-   echo "REACT_APP_BACKEND_URL=https://socialfastapi.preview.emergentagent.com" > .env
+   echo "REACT_APP_BACKEND_URL=https://cluster-metrics.preview.emergentagent.com" > .env
    
    # Reiniciar frontend
    sudo supervisorctl restart frontend
@@ -139,7 +139,7 @@ cat frontend/.env
 curl http://localhost:8001/api/health
 
 # En EMERGENT
-curl https://socialfastapi.preview.emergentagent.com/api/health
+curl https://cluster-metrics.preview.emergentagent.com/api/health
 ```
 
 ---
@@ -149,7 +149,7 @@ curl https://socialfastapi.preview.emergentagent.com/api/health
 | Entorno | Backend URL | Archivo .env |
 |---------|-------------|--------------|
 | **LOCAL** (tu PC) | `http://localhost:8001` | Usar `.env.local.example` |
-| **EMERGENT** (nube) | `https://socialfastapi.preview.emergentagent.com` | Usar `.env.emergent.example` |
+| **EMERGENT** (nube) | `https://cluster-metrics.preview.emergentagent.com` | Usar `.env.emergent.example` |
 
 ---
 

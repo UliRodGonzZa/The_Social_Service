@@ -158,7 +158,7 @@ yarn start
 
 | Aspecto | Local | Emergent |
 |---------|-------|----------|
-| **Backend URL** | `http://localhost:8001` | `https://socialfastapi.preview.emergentagent.com` |
+| **Backend URL** | `http://localhost:8001` | `https://cluster-metrics.preview.emergentagent.com` |
 | **Frontend Puerto** | 3000 | 3000 |
 | **MongoDB** | Docker en 127.0.0.1:27017 | Supervisor |
 | **Redis** | Docker en 127.0.0.1:6379 | No disponible |
@@ -264,7 +264,7 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 
 **En EMERGENT necesita:**
 ```env
-REACT_APP_BACKEND_URL=https://socialfastapi.preview.emergentagent.com
+REACT_APP_BACKEND_URL=https://cluster-metrics.preview.emergentagent.com
 ```
 
 **Acción:**
