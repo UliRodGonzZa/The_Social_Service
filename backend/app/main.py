@@ -121,6 +121,38 @@ class DMConversationSummary(BaseModel):
     last_message_at: str  # ISO
     unread_count: int
 
+class AdminSummary(BaseModel):
+    total_users: int
+    total_posts: int
+    total_dms: int
+    active_users_last_7d: int
+    posts_last_7d: int
+    dms_last_7d: int
+
+class TopPoster(BaseModel):
+    username: str
+    posts_count: int
+
+class PostsByDay(BaseModel):
+    date: str  # "YYYY-MM-DD"
+    count: int
+
+class DMStatsSummary(BaseModel):
+    total_dms: int
+    unread_dms: int
+    users_with_dms: int
+
+class UserAdminStats(BaseModel):
+    username: str
+    email: Optional[str]
+    name: Optional[str]
+    bio: Optional[str]
+
+    posts_count: int
+    dms_sent_count: int
+    dms_received_count: int
+    dms_unread_received: int
+
 # --------- Helpers de DB (simples, por-request) ---------
 
 def get_mongo_db():
