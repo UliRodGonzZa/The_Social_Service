@@ -1221,7 +1221,9 @@ def get_post_likes(post_id: str, username: str = None):
     
     return LikeResponse(
         post_id=post_id,
-
+        likes_count=count,
+        user_liked=user_liked
+    )
 
 @app.get("/posts/{post_id}/likes/users", response_model=PostLikesDetail)
 def get_post_likes_users(post_id: str):
