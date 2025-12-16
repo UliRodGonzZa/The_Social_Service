@@ -4,15 +4,14 @@
  * Dashboard para monitorear el estado y métricas del Redis Cluster.
  * 
  * Tabs:
- * 1. Cluster Health - Topología, nodos, estado, métricas por nodo
- * 2. Messaging Metrics - Mensajes/min, presencia, unread (Sprint 2)
- * 3. Data Distribution - Mapeo chatId → slot → master (Sprint 3)
+ * 1. Cluster Health - Topología, nodos, estado, métricas por nodo (Sprint 1)
+ * 2. Data Distribution - Mapeo chatId → slot → master (Sprint 3)
  */
 
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import ClusterHealthTab from '../features/observability/ClusterHealthTab';
-import MessagingMetricsTab from '../features/observability/MessagingMetricsTab';
+import DataDistributionTab from '../features/observability/DataDistributionTab';
 
 const ObservabilityPage = () => {
   const [activeTab, setActiveTab] = useState('health'); // 'health', 'messaging', 'distribution'
