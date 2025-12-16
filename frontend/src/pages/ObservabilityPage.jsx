@@ -77,18 +77,6 @@ const ObservabilityPage = () => {
               </button>
               
               <button
-                onClick={() => setActiveTab('messaging')}
-                className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${
-                  activeTab === 'messaging'
-                    ? 'border-accent text-accent'
-                    : 'border-transparent text-text-secondary hover:text-text-primary'
-                }`}
-                data-testid="tab-messaging-metrics"
-              >
-                💬 Messaging Metrics
-              </button>
-              
-              <button
                 onClick={() => setActiveTab('distribution')}
                 className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${
                   activeTab === 'distribution'
@@ -96,7 +84,6 @@ const ObservabilityPage = () => {
                     : 'border-transparent text-text-secondary hover:text-text-primary'
                 }`}
                 data-testid="tab-data-distribution"
-                disabled
               >
                 🗺️ Data Distribution
                 <span className="ml-2 text-xs text-text-secondary">(Sprint 3)</span>
